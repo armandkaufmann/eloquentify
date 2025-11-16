@@ -411,11 +411,11 @@ describe("QueryBuilderTest", () => {
                     expect(result).toBe(expectedResult);
                 });
 
-                test("whereNone: Builds where query string", async () => {
+                test("whereNot: Builds where query string", async () => {
                     const result = await new Query()
                         .from('my_table')
                         .where('test_name', '=', 'John')
-                        .whereNone([
+                        .whereNot([
                             'name',
                             'email',
                             'phone',
