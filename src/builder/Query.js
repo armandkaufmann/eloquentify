@@ -162,12 +162,17 @@ export class Query {
 
     /**
      * @async
+     * @param {...string|Raw|Array<string|Raw>} columns - add columns to be selected
      * @throws TableNotSetError
      * @returns {Promise<(Object|Model)[]>|Promise<[]>|[]}
      * @description Execute the query as a "select" statement.
      */
-    async get() {
+    async get(...columns) {
         this.#validateTableSet();
+
+        if (columns) {
+            this.select(...columns);
+        }
 
         if (this.#toSql) {
             return this.#buildSelectQuery();
