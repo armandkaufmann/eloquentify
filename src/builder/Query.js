@@ -815,7 +815,7 @@ export class Query {
      * @returns Query
      * @description Add a basic "where not" clause to the query.
      */
-    whereNot(columns, operator, value) {
+    whereNone(columns, operator, value) {
         this.#queryWhere.push(new WhereNone(columns, operator, value));
 
         return this;
