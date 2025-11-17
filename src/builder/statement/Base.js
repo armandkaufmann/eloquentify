@@ -65,6 +65,17 @@ export class Base {
     }
 
     /**
+     * @returns Base
+     */
+    clone() {
+        return new Base(
+            [...this._bindings],
+            this._query,
+            this._separator
+        );
+    }
+
+    /**
      * @param {string} query
      * @param {Array<String|Number>} bindings
      * @param {String|'?'} [replacer='?']

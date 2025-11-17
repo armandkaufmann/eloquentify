@@ -31,3 +31,12 @@ export class InvalidBetweenValueArrayLength extends Error {
         this.name = "InvalidBetweenValueArrayLength";
     }
 }
+
+export class MissingRequiredArgument extends Error {
+    constructor(classReference, method) {
+        const message = `\nAttempting to call a method with missing arguments: ${classReference}.${method}`;
+
+        super(message);
+        this.name = "MissingRequiredArgument";
+    }
+}

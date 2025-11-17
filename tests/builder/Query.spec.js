@@ -3,10 +3,9 @@ import {Query} from "../../src/builder/Query.js";
 import {
     InvalidComparisonOperatorError,
     InvalidBetweenValueArrayLength,
-    TableNotSetError
+    TableNotSetError, MissingRequiredArgument
 } from "../../src/errors/QueryBuilder/Errors.js";
 import {DB} from "../../src/DB.js";
-import {defaultConfig} from "../../src/config/Default.js";
 
 vi.mock("../../src/DB.js", () => {
     const DB = vi.fn();
@@ -69,7 +68,7 @@ describe("QueryBuilderTest", () => {
                 const result = await Query.toSql()
                     .from('my_table')
                     .where('name', '=', 'John')
-                    .select('id', 'name')
+                    .select('id', 'name', ['purchases', 'cash_money'])
                     .limit(2)
                     .groupBy('class')
                     .offset(5)
@@ -78,7 +77,7 @@ describe("QueryBuilderTest", () => {
                     .having('class', 'LIKE', '%example%')
                     .get();
 
-                const expectedResult = "SELECT `id`, `name` FROM `my_table` LEFT JOIN `comments` ON `my_table`.`id` = `comments`.`my_table_id` WHERE `name` = 'John' GROUP BY `class` HAVING `class` LIKE '%example%' ORDER BY `id` ASC LIMIT 2 OFFSET 5"
+                const expectedResult = "SELECT `id`, `name`, `purchases`, `cash_money` FROM `my_table` LEFT JOIN `comments` ON `my_table`.`id` = `comments`.`my_table_id` WHERE `name` = 'John' GROUP BY `class` HAVING `class` LIKE '%example%' ORDER BY `id` ASC LIMIT 2 OFFSET 5"
 
                 expect(result).toBe(expectedResult);
             });
@@ -412,11 +411,11 @@ describe("QueryBuilderTest", () => {
                     expect(result).toBe(expectedResult);
                 });
 
-                test("whereNone: Builds where query string", async () => {
+                test("whereNot: Builds where query string", async () => {
                     const result = await new Query()
                         .from('my_table')
                         .where('test_name', '=', 'John')
-                        .whereNone([
+                        .whereNot([
                             'name',
                             'email',
                             'phone',
@@ -1303,6 +1302,44 @@ describe("QueryBuilderTest", () => {
 
                 expect(result).toBe("SELECT * FROM `my_table` LIMIT 1");
             });
+
+            test("First query string shorthand", async () => {
+                const result = await new Query()
+                    .from('my_table')
+                    .toSql()
+                    .first('id', 'name');
+
+                expect(result).toBe("SELECT `id`, `name` FROM `my_table` LIMIT 1");
+            });
+
+            test("First query string shorthand with array", async () => {
+                const result = await new Query()
+                    .from('my_table')
+                    .toSql()
+                    .first(['id', 'name'], 'taco');
+
+                expect(result).toBe("SELECT `id`, `name`, `taco` FROM `my_table` LIMIT 1");
+            });
+        });
+
+        describe("Find", () => {
+            test("It builds query", async () => {
+                const result = await new Query()
+                    .from('my_table')
+                    .toSql()
+                    .find(10);
+
+                expect(result).toBe("SELECT * FROM `my_table` WHERE `id` = 10 LIMIT 1");
+            });
+
+            test("It builds query with columns", async () => {
+                const result = await new Query()
+                    .from('my_table')
+                    .toSql()
+                    .find(10, 'id', 'name', 'level');
+
+                expect(result).toBe("SELECT `id`, `name`, `level` FROM `my_table` WHERE `id` = 10 LIMIT 1");
+            });
         });
 
         describe("Offset", () => {
@@ -1473,7 +1510,62 @@ describe("QueryBuilderTest", () => {
 
                 expect(result).toBe("DELETE FROM users WHERE `name` = 'john' ORDER BY `name` ASC LIMIT 1");
             })
-        })
+        });
+    });
+
+    describe("Utility Functions", () => {
+        describe("Clone", () => {
+            let query;
+            const queryResult = "SELECT `id`, `name`, `classes` FROM `my_table` LEFT JOIN `comments` ON `my_table`.`id` = `comments`.`my_table_id` WHERE `name` = 'John' GROUP BY `class` HAVING `classes` > 10 ORDER BY `id` ASC LIMIT 2 OFFSET 5";
+
+            beforeEach(() => {
+                query = Query
+                    .from('my_table')
+                    .where('name', '=', 'John')
+                    .select('id', 'name', 'classes')
+                    .limit(2)
+                    .groupBy('class')
+                    .offset(5)
+                    .leftJoin('comments', 'my_table.id', '=', 'comments.my_table_id')
+                    .orderBy('id')
+                    .having('classes', '>', 10);
+            });
+
+            test("Clone: It Can deeply clone a query object", async () => {
+                const queryClone = query.clone();
+                const queryCloneResult = await queryClone.toSql().get();
+                const originalQueryResult = await query.toSql().get();
+
+                expect(originalQueryResult).toEqual(queryResult);
+                expect(originalQueryResult).toEqual(queryCloneResult);
+            });
+
+            test("Clone: It does not use a reference to any internal attribute objects", async () => {
+                const queryClone = query.clone();
+
+                query.where('John', 'Pork');
+
+                const queryCloneResult = await queryClone.toSql().get();
+                const originalQueryResult = await query.toSql().get();
+
+                const result = "SELECT `id`, `name`, `classes` FROM `my_table` LEFT JOIN `comments` ON `my_table`.`id` = `comments`.`my_table_id` WHERE `name` = 'John' AND `John` = 'Pork' GROUP BY `class` HAVING `classes` > 10 ORDER BY `id` ASC LIMIT 2 OFFSET 5";
+
+                expect(originalQueryResult).toEqual(result);
+                expect(originalQueryResult).not.toEqual(queryCloneResult);
+            });
+
+            test("Clone Without: excludes attributes when cloned", async () => {
+                const queryClone = query.cloneWithout('select', 'where', 'having');
+
+                const queryCloneResult = await queryClone.toSql().get();
+                const originalQueryResult = await query.toSql().get();
+
+                const expectedCloneResult = "SELECT * FROM `my_table` LEFT JOIN `comments` ON `my_table`.`id` = `comments`.`my_table_id` GROUP BY `class` ORDER BY `id` ASC LIMIT 2 OFFSET 5";
+
+                expect(originalQueryResult).toEqual(queryResult);
+                expect(queryCloneResult).toEqual(expectedCloneResult);
+            });
+        });
     });
 
     describe("Validation", () => {
@@ -1631,6 +1723,52 @@ describe("QueryBuilderTest", () => {
                 expect(DB.prototype.all).toHaveBeenCalledOnce();
                 expect(DB.prototype.all).toHaveBeenCalledWith(preparedQuery, preparedBindings);
             });
+
+            test("It allows columns to be added with the get() method with rest args", async () => {
+                const mockGetReturn = [{foo: 'bar'}];
+                DB.prototype.all.mockResolvedValueOnce(mockGetReturn);
+
+                const result = await Query
+                    .from('my_table')
+                    .where('name', '=', 'John')
+                    .limit(2)
+                    .groupBy('class')
+                    .offset(5)
+                    .leftJoin('comments', 'my_table.id', '=', 'comments.my_table_id')
+                    .orderBy('id')
+                    .having('class', 'LIKE', '%example%')
+                    .get('id', 'name');
+
+                const preparedQuery = "SELECT `id`, `name` FROM `my_table` LEFT JOIN `comments` ON `my_table`.`id` = `comments`.`my_table_id` WHERE `name` = ? GROUP BY `class` HAVING `class` LIKE ? ORDER BY `id` ASC LIMIT ? OFFSET ?"
+                const preparedBindings = ['John', '%example%', 2, 5];
+
+                expect(result).toEqual(mockGetReturn);
+                expect(DB.prototype.all).toHaveBeenCalledOnce();
+                expect(DB.prototype.all).toHaveBeenCalledWith(preparedQuery, preparedBindings);
+            });
+
+            test("It allows columns to be added with the get() method with array", async () => {
+                const mockGetReturn = [{foo: 'bar'}];
+                DB.prototype.all.mockResolvedValueOnce(mockGetReturn);
+
+                const result = await Query
+                    .from('my_table')
+                    .where('name', '=', 'John')
+                    .limit(2)
+                    .groupBy('class')
+                    .offset(5)
+                    .leftJoin('comments', 'my_table.id', '=', 'comments.my_table_id')
+                    .orderBy('id')
+                    .having('class', 'LIKE', '%example%')
+                    .get(['id', 'name']);
+
+                const preparedQuery = "SELECT `id`, `name` FROM `my_table` LEFT JOIN `comments` ON `my_table`.`id` = `comments`.`my_table_id` WHERE `name` = ? GROUP BY `class` HAVING `class` LIKE ? ORDER BY `id` ASC LIMIT ? OFFSET ?"
+                const preparedBindings = ['John', '%example%', 2, 5];
+
+                expect(result).toEqual(mockGetReturn);
+                expect(DB.prototype.all).toHaveBeenCalledOnce();
+                expect(DB.prototype.all).toHaveBeenCalledWith(preparedQuery, preparedBindings);
+            });
         });
 
         describe("First", () => {
@@ -1651,6 +1789,56 @@ describe("QueryBuilderTest", () => {
 
                 const preparedQuery = "SELECT `id`, `name` FROM `my_table` LEFT JOIN `comments` ON `my_table`.`id` = `comments`.`my_table_id` WHERE `name` = ? GROUP BY `class` HAVING `class` LIKE ? ORDER BY `id` ASC LIMIT ? OFFSET ?"
                 const preparedBindings = ['John', '%example%', 1, 5];
+
+                expect(result).toEqual(mockGetReturn);
+                expect(DB.prototype.get).toHaveBeenCalledOnce();
+                expect(DB.prototype.get).toHaveBeenCalledWith(preparedQuery, preparedBindings);
+            });
+        });
+
+        describe("Find", () => {
+            test("It binds and executes query", async () => {
+                const mockGetReturn = {foo: 'bar'};
+                DB.prototype.get.mockResolvedValueOnce(mockGetReturn);
+
+                const result = await Query
+                    .from('my_table')
+                    .find(420);
+
+                const preparedQuery = "SELECT * FROM `my_table` WHERE `id` = ? LIMIT ?"
+                const preparedBindings = [420, 1];
+
+                expect(result).toEqual(mockGetReturn);
+                expect(DB.prototype.get).toHaveBeenCalledOnce();
+                expect(DB.prototype.get).toHaveBeenCalledWith(preparedQuery, preparedBindings);
+            });
+
+            test("It binds and executes query with extra columns from array", async () => {
+                const mockGetReturn = {foo: 'bar'};
+                DB.prototype.get.mockResolvedValueOnce(mockGetReturn);
+
+                const result = await Query
+                    .from('my_table')
+                    .find(420, ['id', 'name']);
+
+                const preparedQuery = "SELECT `id`, `name` FROM `my_table` WHERE `id` = ? LIMIT ?"
+                const preparedBindings = [420, 1];
+
+                expect(result).toEqual(mockGetReturn);
+                expect(DB.prototype.get).toHaveBeenCalledOnce();
+                expect(DB.prototype.get).toHaveBeenCalledWith(preparedQuery, preparedBindings);
+            });
+
+            test("It binds and executes query with extra columns from rest args", async () => {
+                const mockGetReturn = {foo: 'bar'};
+                DB.prototype.get.mockResolvedValueOnce(mockGetReturn);
+
+                const result = await Query
+                    .from('my_table')
+                    .find(420, 'id', 'name');
+
+                const preparedQuery = "SELECT `id`, `name` FROM `my_table` WHERE `id` = ? LIMIT ?"
+                const preparedBindings = [420, 1];
 
                 expect(result).toEqual(mockGetReturn);
                 expect(DB.prototype.get).toHaveBeenCalledOnce();
@@ -1706,5 +1894,180 @@ describe("QueryBuilderTest", () => {
                 expect(DB.prototype.updateOrDelete).toHaveBeenCalledWith(preparedQuery, preparedBindings);
             })
         });
-    })
+
+        describe("Aggregates", () => {
+            describe("Count", () => {
+                test("It builds query and executes without specified column", async () => {
+                    const mockReturnValue = [{aggregate: 1}]
+                    DB.prototype.all.mockResolvedValueOnce(mockReturnValue);
+
+                    const expectedQuery = "SELECT COUNT(*) AS aggregate FROM (SELECT * FROM `users` WHERE `id` > ?) AS temp_table";
+                    const expectedBindings = [20];
+
+                    const result = await Query
+                        .from('users')
+                        .where('id', '>', 20)
+                        .count();
+
+                    expect(result).toEqual(1);
+                    expect(DB.prototype.all).toHaveBeenCalledOnce();
+                    expect(DB.prototype.all).toHaveBeenCalledWith(expectedQuery, expectedBindings);
+                });
+
+                test("It builds query and executes with specified column", async () => {
+                    const mockReturnValue = [{aggregate: 1}]
+                    DB.prototype.all.mockResolvedValueOnce(mockReturnValue);
+
+                    const expectedQuery = "SELECT COUNT(temp_table.`id`) AS aggregate FROM (SELECT * FROM `users` WHERE `id` > ?) AS temp_table";
+                    const expectedBindings = [20];
+
+                    const result = await Query
+                        .from('users')
+                        .where('id', '>', 20)
+                        .count('id');
+
+                    expect(result).toEqual(1);
+                    expect(DB.prototype.all).toHaveBeenCalledOnce();
+                    expect(DB.prototype.all).toHaveBeenCalledWith(expectedQuery, expectedBindings);
+                });
+            });
+
+            describe("Sum", () => {
+                test("It throws without specified column", async () => {
+                    await expect(
+                        async () => await Query
+                            .from('users')
+                            .where('id', '>', 20)
+                            .sum()
+                    ).rejects.toThrow(MissingRequiredArgument);
+
+                    expect(DB.prototype.all).not.toHaveBeenCalled()
+                });
+
+                test("It builds query and executes with specified column", async () => {
+                    const mockReturnValue = [{aggregate: 420}]
+                    DB.prototype.all.mockResolvedValueOnce(mockReturnValue);
+
+                    const expectedQuery = "SELECT SUM(temp_table.`purchase_count`) AS aggregate FROM (SELECT * FROM `users` WHERE `id` > ?) AS temp_table";
+                    const expectedBindings = [20];
+
+                    const result = await Query
+                        .from('users')
+                        .where('id', '>', 20)
+                        .sum('purchase_count');
+
+                    expect(result).toEqual(420);
+                    expect(DB.prototype.all).toHaveBeenCalledOnce();
+                    expect(DB.prototype.all).toHaveBeenCalledWith(expectedQuery, expectedBindings);
+                });
+            });
+
+            describe("Average", () => {
+                test("It throws without specified column", async () => {
+                    await expect(
+                        async () => await Query
+                            .from('users')
+                            .where('id', '>', 20)
+                            .avg()
+                    ).rejects.toThrow(MissingRequiredArgument);
+
+                    expect(DB.prototype.all).not.toHaveBeenCalled()
+                });
+
+                test("Avg: It builds query and executes with specified column", async () => {
+                    const mockReturnValue = [{aggregate: 1.67}]
+                    DB.prototype.all.mockResolvedValueOnce(mockReturnValue);
+
+                    const expectedQuery = "SELECT AVG(temp_table.`purchase_count`) AS aggregate FROM (SELECT * FROM `users` WHERE `id` > ?) AS temp_table";
+                    const expectedBindings = [20];
+
+                    const result = await Query
+                        .from('users')
+                        .where('id', '>', 20)
+                        .avg('purchase_count');
+
+                    expect(result).toEqual(1.67);
+                    expect(DB.prototype.all).toHaveBeenCalledOnce();
+                    expect(DB.prototype.all).toHaveBeenCalledWith(expectedQuery, expectedBindings);
+                });
+
+                test("Average: It builds query and executes with specified column", async () => {
+                    const mockReturnValue = [{aggregate: 1.67}]
+                    DB.prototype.all.mockResolvedValueOnce(mockReturnValue);
+
+                    const expectedQuery = "SELECT AVG(temp_table.`purchase_count`) AS aggregate FROM (SELECT * FROM `users` WHERE `id` > ?) AS temp_table";
+                    const expectedBindings = [20];
+
+                    const result = await Query
+                        .from('users')
+                        .where('id', '>', 20)
+                        .average('purchase_count');
+
+                    expect(result).toEqual(1.67);
+                    expect(DB.prototype.all).toHaveBeenCalledOnce();
+                    expect(DB.prototype.all).toHaveBeenCalledWith(expectedQuery, expectedBindings);
+                });
+            });
+
+            describe("Min", () => {
+                test("It throws without specified column", async () => {
+                    await expect(
+                        async () => await Query
+                            .from('users')
+                            .where('id', '>', 20)
+                            .min()
+                    ).rejects.toThrow(MissingRequiredArgument);
+
+                    expect(DB.prototype.all).not.toHaveBeenCalled()
+                });
+
+                test("It builds query and executes with specified column", async () => {
+                    const mockReturnValue = [{aggregate: 2}]
+                    DB.prototype.all.mockResolvedValueOnce(mockReturnValue);
+
+                    const expectedQuery = "SELECT MIN(temp_table.`purchase_count`) AS aggregate FROM (SELECT * FROM `users` WHERE `id` > ?) AS temp_table";
+                    const expectedBindings = [20];
+
+                    const result = await Query
+                        .from('users')
+                        .where('id', '>', 20)
+                        .min('purchase_count');
+
+                    expect(result).toEqual(2);
+                    expect(DB.prototype.all).toHaveBeenCalledOnce();
+                    expect(DB.prototype.all).toHaveBeenCalledWith(expectedQuery, expectedBindings);
+                });
+            });
+
+            describe("Max", () => {
+                test("It throws without specified column", async () => {
+                    await expect(
+                        async () => await Query
+                            .from('users')
+                            .where('id', '>', 20)
+                            .max()
+                    ).rejects.toThrow(MissingRequiredArgument);
+
+                    expect(DB.prototype.all).not.toHaveBeenCalled()
+                });
+
+                test("It builds query and executes with specified column", async () => {
+                    const mockReturnValue = [{aggregate: 1337}]
+                    DB.prototype.all.mockResolvedValueOnce(mockReturnValue);
+
+                    const expectedQuery = "SELECT MAX(temp_table.`purchase_count`) AS aggregate FROM (SELECT * FROM `users` WHERE `id` > ?) AS temp_table";
+                    const expectedBindings = [20];
+
+                    const result = await Query
+                        .from('users')
+                        .where('id', '>', 20)
+                        .max('purchase_count');
+
+                    expect(result).toEqual(1337);
+                    expect(DB.prototype.all).toHaveBeenCalledOnce();
+                    expect(DB.prototype.all).toHaveBeenCalledWith(expectedQuery, expectedBindings);
+                });
+            });
+        });
+    });
 });

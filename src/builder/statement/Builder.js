@@ -104,6 +104,48 @@ export default class Builder {
         return this;
     }
 
+    /**
+     * @return Builder
+     */
+    clone() {
+        const clone = new Builder(this.#type);
+        clone._hydrate(
+            this.#statements.map((statement) => statement.clone()),
+            this.#type,
+            this.#withStatement,
+            this.#defaultQueryPartial,
+            this.#glue,
+            this.#withDistinct,
+        );
+
+        return clone;
+    }
+
+    /**
+     * @return Boolean
+     */
+    isEmpty() {
+        return this.#statements.length === 0;
+    }
+
+    /**
+     * @param {Array<Base|Group>} statements
+     * @param {Boolean} type
+     * @param {Boolean} withStatement
+     * @param {string|null} defaultQueryPartial
+     * @param {string} glue
+     * @param {Boolean} withDistinct
+     * @return Builder
+     */
+    _hydrate(statements, type, withStatement, defaultQueryPartial, glue, withDistinct) {
+        this.#statements = statements;
+        this.#type = type;
+        this.#withStatement = withStatement;
+        this.#defaultQueryPartial = defaultQueryPartial;
+        this.#glue = glue;
+        this.#withDistinct = withDistinct;
+    }
+
     #isNotAppendable() {
         return this.#type === STATEMENTS.limit || this.#type === STATEMENTS.offset;
     }

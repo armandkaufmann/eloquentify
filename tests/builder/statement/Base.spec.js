@@ -50,4 +50,21 @@ describe("Statement: Base Test", () => {
         });
     });
 
+    describe("Clone", () => {
+        test("It clones the base class", () => {
+            const query = "WHERE name = ? AND age > ?";
+            const bindings = ['John', 20];
+            const expectedString = "WHERE name = 'John' AND age > 20";
+
+            const originalClass =  new Base(bindings, query, 'AND');
+            const originalResult = originalClass.toString();
+
+            const clonedClass = originalClass.clone();
+            const clonedResult = clonedClass.toString();
+
+            expect(originalResult).toEqual(expectedString);
+            expect(originalResult).toEqual(clonedResult);
+        });
+    })
+
 });

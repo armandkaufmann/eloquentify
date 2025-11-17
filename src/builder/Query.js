@@ -61,6 +61,11 @@ import WhereExists from "./statement/where/WhereExists.js";
 import OrWhereExists from "./statement/where/OrWhereExists.js";
 import WhereNotExists from "./statement/where/WhereNotExists.js";
 import OrWhereNotExists from "./statement/where/OrWhereNotExists.js";
+import {Count} from "./aggregates/Count.js";
+import {Sum} from "./aggregates/Sum.js";
+import {Average} from "./aggregates/Average.js";
+import {Min} from "./aggregates/Min.js";
+import {Max} from "./aggregates/Max.js";
 
 export class Query {
     /** @type {?string} */
@@ -93,6 +98,7 @@ export class Query {
      * @param {string} table
      * @param {string|null} [as=null]
      * @returns Query
+     * @description Begin a fluent query against a database table.
      */
     static from(table, as = null) {
         return new Query().from(table, as)
@@ -116,6 +122,7 @@ export class Query {
     /**
      * @param {string} statement
      * @returns Raw
+     * @description Create a raw database expression.
      */
     static raw(statement) {
         return new Raw(statement);
@@ -125,6 +132,7 @@ export class Query {
      * @param {string} table
      * @param {string|null} [as=null]
      * @returns Query
+     * @description Set the table which the query is targeting.
      */
     from(table, as = null) {
         this.#table = table;
@@ -134,6 +142,7 @@ export class Query {
 
     /**
      * @returns Query
+     * @description set the query instance to return the raw unprepared query string at execution
      */
     toSql() {
         this.#toSql = true;
@@ -153,53 +162,241 @@ export class Query {
 
     /**
      * @async
+     * @param {...string|Raw|Array<string|Raw>} columns - add columns to be selected
      * @throws TableNotSetError
-     * @returns {string|Promise<(Object|Model)[]>|[]}
-     * @description Execute and return the result of the current select query. If the ```QueryBuilder``` has a reference to a model
-     * then it will return the result cast into the referencing ```Model```. If ```toSql()``` is called beforehand, this will return the full query string.
-     * Otherwise, this will
+     * @returns {Promise<(Object|Model)[]>|Promise<[]>|[]}
+     * @description Execute the query as a "select" statement.
      */
-    async get() {
+    async get(...columns) {
         this.#validateTableSet();
 
-        if (this.#toSql) {
-            return this.#buildFullSelectSqlQuery();
+        if (columns) {
+            this.select(...columns);
         }
 
-        const prepareObject = this.#buildFullPrepareObjectQuery();
+        if (this.#toSql) {
+            return this.#buildSelectQuery();
+        }
+
+        const prepareObject = this.#buildSelectQuery();
         return await this.#database.all(prepareObject.query, prepareObject.bindings);
     }
 
     /**
      * @async
-     * @returns {string|Promise<Object|Model|null>|null}
-     * @description Executes the query and retrieves the first result
+     * @param {...string|Raw|Array<string|Raw>} columns - add columns to be selected
+     * @throws TableNotSetError
+     * @returns {Promise<Object|Model|null>|null}
+     * @description Execute the query and get the first result.
      */
-    async first() {
+    async first(...columns) {
         this.#validateTableSet();
 
         this.limit(1);
 
-        if (this.#toSql) {
-            return this.#buildFullSelectSqlQuery();
+        if (columns) {
+            this.select(...columns);
         }
 
-        const prepareObject = this.#buildFullPrepareObjectQuery();
+        if (this.#toSql) {
+            return this.#buildSelectQuery();
+        }
+
+        const prepareObject = this.#buildSelectQuery();
         return await this.#database.get(prepareObject.query, prepareObject.bindings);
+    }
+
+    /**
+     * @async
+     * @param {number|string} id
+     * @param {...string|Raw|Array<string|Raw>} columns - add columns to be selected
+     * @throws TableNotSetError
+     * @returns {Promise<Object|Model|null>|null}
+     * @description Execute a query for a single record by ID.
+     */
+    async find(id, ...columns) {
+        return this.where('id', '=', id).first(...columns);
+    }
+
+    /**
+     * @async
+     * @param {String} [column="*"]
+     * @returns {Number}
+     * @description Retrieve the "count" result of the query.
+     */
+    async count(column = "*") {
+        return this._aggregate(Count, column);
+    }
+
+    /**
+     * @async
+     * @param {String} column
+     * @returns {Number}
+     * @throws MissingRequiredArgument
+     * @description Retrieve the sum of the values of a given column.
+     */
+    async sum(column) {
+        return this._aggregate(Sum, column);
+    }
+
+    /**
+     * @async
+     * @param {String} column
+     * @returns {Number}
+     * @throws MissingRequiredArgument
+     * @description Retrieve the average of the values of a given column.
+     */
+    async avg(column) {
+        return this._aggregate(Average, column);
+    }
+
+    /**
+     * @async
+     * @param {String} column
+     * @returns {Number}
+     * @throws MissingRequiredArgument
+     * @description Retrieve the average of the values of a given column.
+     */
+    async average(column) {
+        return this.avg(column);
+    }
+
+    /**
+     * @async
+     * @param {String} column
+     * @returns {Number}
+     * @throws MissingRequiredArgument
+     * @description Retrieve the minimum value of a given column.
+     */
+    async min(column) {
+        return this._aggregate(Min, column);
+    }
+
+    /**
+     * @async
+     * @param {String} column
+     * @returns {Number}
+     * @throws MissingRequiredArgument
+     * @description Retrieve the maximum value of a given column.
+     */
+    async max(column) {
+        return this._aggregate(Max, column);
+    }
+
+    /**
+     * @async
+     * @param {BaseAggregate} aggregateClass
+     * @param {String} column
+     * @returns {Number}
+     */
+    async _aggregate(aggregateClass, column) {
+        //todo: check for unions too
+        const clone = this.cloneWithout(this.#queryHaving.isEmpty() ? 'select' : '');
+        const countAggregation = new aggregateClass(clone, column).prepare();
+
+        const dbResult = await this.#database.all(countAggregation.query, countAggregation.bindings);
+
+        return dbResult[0]?.aggregate ?? 0;
     }
 
     /**
      * @returns PrepareObject
      */
     prepare() {
-        return this.#buildFullPrepareObjectQuery();
+        return this.#buildSelectQuery();
+    }
+
+    /**
+     * @param {Object} attributes
+     */
+    _hydrate(attributes) {
+        this.#table = attributes?.table ?? this.#table;
+        this.#model = attributes?.model ?? this.#model;
+        this.#toSql = attributes?.toSql ?? this.#toSql;
+        this.#querySelect = attributes?.select ?? this.#querySelect;
+        this.#queryFrom = attributes?.from ?? this.#queryFrom;
+        this.#queryJoin = attributes?.join ?? this.#queryJoin;
+        this.#queryWhere = attributes?.where ?? this.#queryWhere;
+        this.#queryGroupBy = attributes?.groupBy ?? this.#queryGroupBy;
+        this.#queryHaving = attributes?.having ?? this.#queryHaving;
+        this.#queryOrderBy = attributes?.orderBy ?? this.#queryOrderBy;
+        this.#limit = attributes?.limit ?? this.#limit;
+        this.#offset = attributes?.offset ?? this.#offset;
+    }
+
+    /**
+     * @returns Object
+     */
+    _getAttributes() {
+        return {
+            table: this.#table,
+            model: this.#model,
+            toSql: this.#toSql,
+            select: this.#querySelect,
+            from: this.#queryFrom,
+            join: this.#queryJoin,
+            where: this.#queryWhere,
+            groupBy: this.#queryGroupBy,
+            having: this.#queryHaving,
+            orderBy: this.#queryOrderBy,
+            limit: this.#limit,
+            offset: this.#offset,
+        };
+    }
+
+    /**
+     * @param {?Array<string>} [exclude=[]]
+     * @returns Object
+     */
+    _filterAttributes(exclude = []) {
+        const attributes = this._getAttributes();
+
+        Object.keys(attributes).map((key) => {
+            if (exclude.includes(key)) {
+                delete attributes[key];
+                return;
+            }
+
+            if (attributes[key] instanceof Builder) {
+                attributes[key] = attributes[key].clone();
+            }
+        });
+
+        return attributes;
+    }
+
+    /**
+     * @returns Query
+     * @description Clone the query.
+     */
+    clone() {
+        const clone = new Query();
+        const attributes = this._filterAttributes();
+
+        clone._hydrate(attributes);
+
+        return clone;
+    }
+
+    /**
+     * @param {...string} attributes
+     * @returns Query
+     * @description Clone the query without the given properties.
+     */
+    cloneWithout(...attributes) {
+        const clone = new Query();
+        const cloneAttributes = this._filterAttributes(attributes);
+
+        clone._hydrate(cloneAttributes);
+
+        return clone;
     }
 
     /**
      * @async
      * @param {Record<string, any>} fields
      * @returns {Promise<Boolean>}
-     * @description Executes the query and returns true if record was successfully inserted, false if not
+     * @description Insert new records into the database.
      */
     async insert(fields) {
         this.#validateTableSet();
@@ -216,7 +413,7 @@ export class Query {
      * @async
      * @param {Record<string, any>} fields
      * @returns {Promise<number|null>}
-     * @description Executes the query and returns the ID of the newly inserted record
+     * @description Insert a new record and get the value of the primary key (ID).
      */
     async insertGetId(fields) {
         this.#validateTableSet();
@@ -233,6 +430,7 @@ export class Query {
      * @async
      * @param {Record<string, any>} fields
      * @returns {string|Promise<number|null>}
+     * @description Update records in the database.
      */
     async update(fields) {
         this.#validateTableSet();
@@ -247,7 +445,8 @@ export class Query {
 
     /**
      * @async
-     * @returns {string|Promise<number|null>} - returns number of records deleted.
+     * @returns {string|Promise<number|null>} - number of records deleted.
+     * @description Delete records from the database.
      */
     async delete() {
         this.#validateTableSet();
@@ -261,13 +460,16 @@ export class Query {
     }
 
     /**
-     * @param {...string|Raw} columns
+     * @param {...string|Raw|Array<string|Raw>} columns
      * @returns Query
+     * @description Set the columns to be selected.
      */
     select(...columns) {
         columns.forEach((column) => {
             if (column instanceof Raw) {
                 this.#querySelect.push(column.withSeparator(Separator.Comma));
+            } else if (Array.isArray(column)) {
+                column.forEach((col) => this.#querySelect.push(new Select(col)));
             } else {
                 this.#querySelect.push(new Select(column));
             }
@@ -280,6 +482,7 @@ export class Query {
      * @param {String} expression
      * @param {Array<String|Number>|null} [bindings=null]
      * @returns Query
+     * @description Add a new "raw" select expression to the query.
      */
     selectRaw(expression, bindings = null) {
         this.#querySelect.push(new SelectRaw(expression, bindings));
@@ -289,6 +492,7 @@ export class Query {
 
     /**
      * @returns Query
+     * @description Force the query to only return distinct results.
      */
     distinct() {
         this.#querySelect.setDistinct();
@@ -303,6 +507,7 @@ export class Query {
      * @param {string} foreignKey
      * @returns Query
      * @throws InvalidComparisonOperatorError
+     * @description Add a join clause to the query.
      */
     join(table, localKey, operator, foreignKey) {
         Validation.validateComparisonOperator(operator);
@@ -319,6 +524,7 @@ export class Query {
      * @param {string} foreignKey
      * @returns Query
      * @throws InvalidComparisonOperatorError
+     * @description Add a left join to the query.
      */
     leftJoin(table, localKey, operator, foreignKey) {
         Validation.validateComparisonOperator(operator);
@@ -331,6 +537,7 @@ export class Query {
     /**
      * @param {string} table
      * @returns Query
+     * @description Add a "cross join" clause to the query.
      */
     crossJoin(table) {
         this.#queryJoin.push(new CrossJoin(table));
@@ -343,6 +550,7 @@ export class Query {
      * @param {{(query: Query, value: any)}} callback
      * @param {{(query: Query, value: any)}} [defaultCallback=null]
      * @returns Query
+     * @description Apply the callback if the given "value" is (or resolves to) truthy.
      */
     when(value, callback, defaultCallback = null) {
         if (typeof value === "function") {
@@ -363,7 +571,7 @@ export class Query {
      * @returns boolean
      */
     #isValueTruthy(value) {
-        if (value === null || value === undefined){
+        if (value === null || value === undefined) {
             return false;
         }
 
@@ -392,6 +600,7 @@ export class Query {
      * @param {string|number|null} [value=null]
      * @returns Query
      * @throws InvalidComparisonOperatorError
+     * @description Add a basic where clause to the query.
      */
     where(column, operator, value = null) {
         if (typeof column === "function") {
@@ -422,6 +631,7 @@ export class Query {
      * @param {string|number|null} [value=null]
      * @returns Query
      * @throws InvalidComparisonOperatorError
+     * @description Add an "or where" clause to the query.
      */
     orWhere(column, operator, value = null) {
         if (typeof column === "function") {
@@ -449,6 +659,7 @@ export class Query {
     /**
      * @param {{(query: Query)}|Query} query
      * @returns Query
+     * @description Add an exists clause to the query.
      */
     whereExists(query) {
         this.#whereExistsBuilder(query, WhereExists);
@@ -459,6 +670,7 @@ export class Query {
     /**
      * @param {{(query: Query)}|Query} query
      * @returns Query
+     * @description Add an or exists clause to the query.
      */
     orWhereExists(query) {
         this.#whereExistsBuilder(query, OrWhereExists);
@@ -469,6 +681,7 @@ export class Query {
     /**
      * @param {{(query: Query)}|Query} query
      * @returns Query
+     * @description Add a where not exists clause to the query.
      */
     whereNotExists(query) {
         this.#whereExistsBuilder(query, WhereNotExists);
@@ -479,6 +692,7 @@ export class Query {
     /**
      * @param {{(query: Query)}|Query} query
      * @returns Query
+     * @description Add a where not exists clause to the query.
      */
     orWhereNotExists(query) {
         this.#whereExistsBuilder(query, OrWhereNotExists);
@@ -504,6 +718,7 @@ export class Query {
      * @param {String} expression
      * @param {Array<String|number>|null} [bindings=null]
      * @returns Query
+     * @description Add a raw where clause to the query.
      */
     whereRaw(expression, bindings = null) {
         this.#queryWhere.push(new WhereRaw(expression, bindings));
@@ -515,6 +730,7 @@ export class Query {
      * @param {String} expression
      * @param {Array<String|number>|null} [bindings=null]
      * @returns Query
+     * @description Add a raw or where clause to the query.
      */
     orWhereRaw(expression, bindings = null) {
         this.#queryWhere.push(new OrWhereRaw(expression, bindings));
@@ -525,6 +741,7 @@ export class Query {
     /**
      * @param {string} column
      * @returns Query
+     * @description Add a "where null" clause to the query.
      */
     whereNull(column) {
         this.#queryWhere.push(new WhereNull(column));
@@ -535,6 +752,7 @@ export class Query {
     /**
      * @param {string} column
      * @returns Query
+     * @description Add an "or where null" clause to the query.
      */
     orWhereNull(column) {
         this.#queryWhere.push(new OrWhereNull(column));
@@ -545,6 +763,7 @@ export class Query {
     /**
      * @param {string} column
      * @returns Query
+     * @description Add a "where not null" clause to the query.
      */
     whereNotNull(column) {
         this.#queryWhere.push(new WhereNotNull(column));
@@ -555,6 +774,7 @@ export class Query {
     /**
      * @param {string} column
      * @returns Query
+     * @description Add an "or where not null" clause to the query.
      */
     orWhereNotNull(column) {
         this.#queryWhere.push(new OrWhereNotNull(column));
@@ -567,6 +787,7 @@ export class Query {
      * @param {String} operator
      * @param {String|number} value
      * @returns Query
+     * @description Add an "where" clause to the query for multiple columns with "or" conditions between them.
      */
     whereAny(columns, operator, value) {
         this.#queryWhere.push(new WhereAny(columns, operator, value));
@@ -579,6 +800,7 @@ export class Query {
      * @param {String} operator
      * @param {String|number} value
      * @returns Query
+     * @description Add a "where" clause to the query for multiple columns with "and" conditions between them.
      */
     whereAll(columns, operator, value) {
         this.#queryWhere.push(new WhereAll(columns, operator, value));
@@ -591,8 +813,9 @@ export class Query {
      * @param {String} operator
      * @param {String|number} value
      * @returns Query
+     * @description Add a basic "where not" clause to the query.
      */
-    whereNone(columns, operator, value) {
+    whereNot(columns, operator, value) {
         this.#queryWhere.push(new WhereNone(columns, operator, value));
 
         return this;
@@ -602,6 +825,7 @@ export class Query {
      * @param {string} column
      * @param {Array<string|number>} values
      * @returns Query
+     * @description Add a "where in" clause to the query.
      */
     whereIn(column, values) {
         this.#queryWhere.push(new WhereIn(column, values));
@@ -613,6 +837,7 @@ export class Query {
      * @param {string} column
      * @param {Array<string|number>} values
      * @returns Query
+     * @description Add an "or where in" clause to the query.
      */
     orWhereIn(column, values) {
         this.#queryWhere.push(new OrWhereIn(column, values));
@@ -624,6 +849,7 @@ export class Query {
      * @param {string} column
      * @param {Array<string|number>} values
      * @returns Query
+     * @description Add a "where not in" clause to the query.
      */
     whereNotIn(column, values) {
         this.#queryWhere.push(new WhereNotIn(column, values));
@@ -635,6 +861,7 @@ export class Query {
      * @param {string} column
      * @param {Array<string|number>} values
      * @returns Query
+     * @description Add an "or where not in" clause to the query.
      */
     orWhereNotIn(column, values) {
         this.#queryWhere.push(new OrWhereNotIn(column, values));
@@ -647,6 +874,7 @@ export class Query {
      * @param {Array<string|number>} values
      * @returns Query
      * @throws InvalidBetweenValueArrayLength
+     * @description Add a where between statement to the query.
      */
     whereBetween(column, values) {
         Validation.validateBetweenArrayLength(values);
@@ -661,6 +889,7 @@ export class Query {
      * @param {Array<string|number>} values
      * @returns Query
      * @throws InvalidBetweenValueArrayLength
+     * @description Add an or where between statement to the query.
      */
     orWhereBetween(column, values) {
         Validation.validateBetweenArrayLength(values);
@@ -675,6 +904,7 @@ export class Query {
      * @param {Array<string|number>} values
      * @returns Query
      * @throws InvalidBetweenValueArrayLength
+     * @description Add a where not between statement to the query.
      */
     whereNotBetween(column, values) {
         Validation.validateBetweenArrayLength(values);
@@ -689,6 +919,7 @@ export class Query {
      * @param {Array<string|number>} values
      * @returns Query
      * @throws InvalidBetweenValueArrayLength
+     * @description Add an or where not between statement to the query.
      */
     orWhereNotBetween(column, values) {
         Validation.validateBetweenArrayLength(values);
@@ -704,6 +935,7 @@ export class Query {
      * @param {string|null} [comparisonColumn=null]
      * @returns Query
      * @throws InvalidComparisonOperatorError
+     * @description Add a "where" clause comparing two columns to the query.
      */
     whereColumn(column, operator, comparisonColumn = null) {
         if (!comparisonColumn) {
@@ -724,6 +956,7 @@ export class Query {
      * @param {string|null} [comparisonColumn=null]
      * @returns Query
      * @throws InvalidComparisonOperatorError
+     * @description Add an "or where" clause comparing two columns to the query.
      */
     orWhereColumn(column, operator, comparisonColumn = null) {
         if (!comparisonColumn) {
@@ -743,6 +976,7 @@ export class Query {
      * @param {Array<string>} columns
      * @returns Query
      * @throws InvalidBetweenValueArrayLength
+     * @description Add a where between statement using columns to the query.
      */
     whereBetweenColumns(column, columns) {
         Validation.validateBetweenArrayLength(columns);
@@ -757,6 +991,7 @@ export class Query {
      * @param {Array<string>} columns
      * @returns Query
      * @throws InvalidBetweenValueArrayLength
+     * @description Add an or where between statement using columns to the query.
      */
     orWhereBetweenColumns(column, columns) {
         Validation.validateBetweenArrayLength(columns);
@@ -771,6 +1006,7 @@ export class Query {
      * @param {Array<string>} columns
      * @returns Query
      * @throws InvalidBetweenValueArrayLength
+     * @description Add a where not between statement using columns to the query.
      */
     whereNotBetweenColumns(column, columns) {
         Validation.validateBetweenArrayLength(columns);
@@ -785,6 +1021,7 @@ export class Query {
      * @param {Array<string>} columns
      * @returns Query
      * @throws InvalidBetweenValueArrayLength
+     * @description Add an or where not between statement using columns to the query.
      */
     orWhereNotBetweenColumns(column, columns) {
         Validation.validateBetweenArrayLength(columns);
@@ -797,6 +1034,7 @@ export class Query {
     /**
      * @param {...string|Raw} columns
      * @returns Query
+     * @description Add a "group by" clause to the query.
      */
     groupBy(...columns) {
         columns.forEach((column) => {
@@ -813,6 +1051,7 @@ export class Query {
     /**
      * @param {string} expression
      * @returns Query
+     * @description Add a raw groupBy clause to the query.
      */
     groupByRaw(expression) {
         this.#queryGroupBy.push(new GroupByRaw(expression));
@@ -826,6 +1065,7 @@ export class Query {
      * @param {string|number|null} [value=null]
      * @returns Query
      * @throws InvalidComparisonOperatorError
+     * @description Add a "having" clause to the query.
      */
     having(column, operator, value = null) {
         if (typeof column === "function") {
@@ -856,6 +1096,7 @@ export class Query {
      * @param {string|number|null} [value=null]
      * @returns Query
      * @throws InvalidComparisonOperatorError
+     * @description Add an "or having" clause to the query.
      */
     orHaving(column, operator, value = null) {
         if (typeof column === "function") {
@@ -884,6 +1125,7 @@ export class Query {
      * @param {string} expression
      * @param {Array<String|Number>|null} [bindings=null]
      * @returns Query
+     * @description Add a raw having clause to the query.
      */
     havingRaw(expression, bindings = null) {
         this.#queryHaving.push(new HavingRaw(expression, bindings));
@@ -895,6 +1137,7 @@ export class Query {
      * @param {string} expression
      * @param {Array<String|Number>|null} [bindings=null]
      * @returns Query
+     * @description Add a raw or having clause to the query.
      */
     orHavingRaw(expression, bindings = null) {
         this.#queryHaving.push(new OrHavingRaw(expression, bindings));
@@ -907,6 +1150,7 @@ export class Query {
      * @param {Array<String|Number>} values
      * @returns Query
      * @throws InvalidBetweenValueArrayLength
+     * @description Add a "having between " clause to the query.
      */
     havingBetween(column, values) {
         Validation.validateBetweenArrayLength(values);
@@ -921,6 +1165,7 @@ export class Query {
      * @param {Array<String|Number>} values
      * @returns Query
      * @throws InvalidBetweenValueArrayLength
+     * @description Add an or "having between " clause to the query.
      */
     orHavingBetween(column, values) {
         Validation.validateBetweenArrayLength(values);
@@ -934,6 +1179,7 @@ export class Query {
      * @param {string|Raw} column
      * @param {"ASC"|"DESC"} [order=ASC]
      * @returns Query
+     * @description Add an "order by" clause to the query.
      */
     orderBy(column, order = "ASC") {
         if (column instanceof Raw) {
@@ -948,6 +1194,7 @@ export class Query {
     /**
      * @param {string|Raw} column
      * @returns Query
+     * @description Add a descending "order by" clause to the query.
      */
     orderByDesc(column) {
         if (column instanceof Raw) {
@@ -962,6 +1209,7 @@ export class Query {
     /**
      * @param {string} expression
      * @returns Query
+     * @description Add a raw "order by" clause to the query.
      */
     orderByRaw(expression) {
         this.#queryOrderBy.push(new Raw(expression).withSeparator(Separator.Comma));
@@ -971,6 +1219,7 @@ export class Query {
     /**
      * @param {number} number
      * @returns Query
+     * @description Set the "limit" value of the query.
      */
     limit(number) {
         this.#limit.push(new Limit(number));
@@ -980,6 +1229,7 @@ export class Query {
     /**
      * @param {number} number
      * @returns Query
+     * @description Set the "offset" value of the query.
      */
     offset(number) {
         this.#offset.push(new Offset(number));
@@ -1145,7 +1395,7 @@ export class Query {
 
         const bindings = [];
 
-        return { query, bindings};
+        return {query, bindings};
     }
 
     #buildPartialDeleteSqlQuery() {
@@ -1153,31 +1403,28 @@ export class Query {
     }
 
     /**
-     * @returns string
+     * @returns PrepareObject|string
      */
-    #buildFullSelectSqlQuery() {
-        const queries = [
-            this.#querySelect.toString(), this.#queryFrom.toString(),
-            this.#queryJoin.toString(), this.#queryWhere.toString(),
-            this.#queryGroupBy.toString(), this.#queryHaving.toString(),
-            this.#queryOrderBy.toString(), this.#limit.toString(),
-            this.#offset.toString(),
+    #buildSelectQuery() {
+        const queryCollection = [
+            this.#querySelect, this.#queryFrom,
+            this.#queryJoin, this.#queryWhere,
+            this.#queryGroupBy, this.#queryHaving,
+            this.#queryOrderBy, this.#limit,
+            this.#offset,
         ];
 
-        return this.#joinQueryStrings(queries);
-    }
+        const queries = queryCollection.map((query) => {
+            if (this.#toSql) {
+                return query.toString();
+            }
 
-    /**
-     * @returns PrepareObject
-     */
-    #buildFullPrepareObjectQuery() {
-        const queries = [
-            this.#querySelect.prepare(), this.#queryFrom.prepare(),
-            this.#queryJoin.prepare(), this.#queryWhere.prepare(),
-            this.#queryGroupBy.prepare(), this.#queryHaving.prepare(),
-            this.#queryOrderBy.prepare(), this.#limit.prepare(),
-            this.#offset.prepare(),
-        ];
+            return query.prepare();
+        });
+
+        if (this.#toSql) {
+            return this.#joinQueryStrings(queries);
+        }
 
         return this.#joinPrepareObjects(queries);
     }
