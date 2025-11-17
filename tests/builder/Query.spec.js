@@ -68,7 +68,7 @@ describe("QueryBuilderTest", () => {
                 const result = await Query.toSql()
                     .from('my_table')
                     .where('name', '=', 'John')
-                    .select('id', 'name')
+                    .select('id', 'name', ['purchases', 'cash_money'])
                     .limit(2)
                     .groupBy('class')
                     .offset(5)
@@ -77,7 +77,7 @@ describe("QueryBuilderTest", () => {
                     .having('class', 'LIKE', '%example%')
                     .get();
 
-                const expectedResult = "SELECT `id`, `name` FROM `my_table` LEFT JOIN `comments` ON `my_table`.`id` = `comments`.`my_table_id` WHERE `name` = 'John' GROUP BY `class` HAVING `class` LIKE '%example%' ORDER BY `id` ASC LIMIT 2 OFFSET 5"
+                const expectedResult = "SELECT `id`, `name`, `purchases`, `cash_money` FROM `my_table` LEFT JOIN `comments` ON `my_table`.`id` = `comments`.`my_table_id` WHERE `name` = 'John' GROUP BY `class` HAVING `class` LIKE '%example%' ORDER BY `id` ASC LIMIT 2 OFFSET 5"
 
                 expect(result).toBe(expectedResult);
             });
@@ -1301,6 +1301,24 @@ describe("QueryBuilderTest", () => {
                     .first();
 
                 expect(result).toBe("SELECT * FROM `my_table` LIMIT 1");
+            });
+
+            test("First query string shorthand", async () => {
+                const result = await new Query()
+                    .from('my_table')
+                    .toSql()
+                    .first('id', 'name');
+
+                expect(result).toBe("SELECT `id`, `name` FROM `my_table` LIMIT 1");
+            });
+
+            test("First query string shorthand with array", async () => {
+                const result = await new Query()
+                    .from('my_table')
+                    .toSql()
+                    .first(['id', 'name'], 'taco');
+
+                expect(result).toBe("SELECT `id`, `name`, `taco` FROM `my_table` LIMIT 1");
             });
         });
 

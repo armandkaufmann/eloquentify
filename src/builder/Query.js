@@ -179,13 +179,18 @@ export class Query {
 
     /**
      * @async
+     * @param {...string|Raw|Array<string|Raw>} columns - add columns to be selected
      * @returns {Promise<Object|Model|null>|null}
      * @description Execute the query and get the first result.
      */
-    async first() {
+    async first(...columns) {
         this.#validateTableSet();
 
         this.limit(1);
+
+        if (columns) {
+            this.select(...columns);
+        }
 
         if (this.#toSql) {
             return this.#buildSelectQuery();
@@ -437,7 +442,7 @@ export class Query {
     }
 
     /**
-     * @param {...string|Raw} columns
+     * @param {...string|Raw|Array<string|Raw>} columns
      * @returns Query
      * @description Set the columns to be selected.
      */
@@ -445,6 +450,8 @@ export class Query {
         columns.forEach((column) => {
             if (column instanceof Raw) {
                 this.#querySelect.push(column.withSeparator(Separator.Comma));
+            } else if (Array.isArray(column)) {
+                column.forEach((col) => this.#querySelect.push(new Select(col)));
             } else {
                 this.#querySelect.push(new Select(column));
             }
