@@ -1322,6 +1322,26 @@ describe("QueryBuilderTest", () => {
             });
         });
 
+        describe("Find", () => {
+            test("It builds query", async () => {
+                const result = await new Query()
+                    .from('my_table')
+                    .toSql()
+                    .find(10);
+
+                expect(result).toBe("SELECT * FROM `my_table` WHERE `id` = 10 LIMIT 1");
+            });
+
+            test("It builds query with columns", async () => {
+                const result = await new Query()
+                    .from('my_table')
+                    .toSql()
+                    .find(10, 'id', 'name', 'level');
+
+                expect(result).toBe("SELECT `id`, `name`, `level` FROM `my_table` WHERE `id` = 10 LIMIT 1");
+            });
+        });
+
         describe("Offset", () => {
             test("Offset query string", async () => {
                 const result = await Query
@@ -1769,6 +1789,56 @@ describe("QueryBuilderTest", () => {
 
                 const preparedQuery = "SELECT `id`, `name` FROM `my_table` LEFT JOIN `comments` ON `my_table`.`id` = `comments`.`my_table_id` WHERE `name` = ? GROUP BY `class` HAVING `class` LIKE ? ORDER BY `id` ASC LIMIT ? OFFSET ?"
                 const preparedBindings = ['John', '%example%', 1, 5];
+
+                expect(result).toEqual(mockGetReturn);
+                expect(DB.prototype.get).toHaveBeenCalledOnce();
+                expect(DB.prototype.get).toHaveBeenCalledWith(preparedQuery, preparedBindings);
+            });
+        });
+
+        describe("Find", () => {
+            test("It binds and executes query", async () => {
+                const mockGetReturn = {foo: 'bar'};
+                DB.prototype.get.mockResolvedValueOnce(mockGetReturn);
+
+                const result = await Query
+                    .from('my_table')
+                    .find(420);
+
+                const preparedQuery = "SELECT * FROM `my_table` WHERE `id` = ? LIMIT ?"
+                const preparedBindings = [420, 1];
+
+                expect(result).toEqual(mockGetReturn);
+                expect(DB.prototype.get).toHaveBeenCalledOnce();
+                expect(DB.prototype.get).toHaveBeenCalledWith(preparedQuery, preparedBindings);
+            });
+
+            test("It binds and executes query with extra columns from array", async () => {
+                const mockGetReturn = {foo: 'bar'};
+                DB.prototype.get.mockResolvedValueOnce(mockGetReturn);
+
+                const result = await Query
+                    .from('my_table')
+                    .find(420, ['id', 'name']);
+
+                const preparedQuery = "SELECT `id`, `name` FROM `my_table` WHERE `id` = ? LIMIT ?"
+                const preparedBindings = [420, 1];
+
+                expect(result).toEqual(mockGetReturn);
+                expect(DB.prototype.get).toHaveBeenCalledOnce();
+                expect(DB.prototype.get).toHaveBeenCalledWith(preparedQuery, preparedBindings);
+            });
+
+            test("It binds and executes query with extra columns from rest args", async () => {
+                const mockGetReturn = {foo: 'bar'};
+                DB.prototype.get.mockResolvedValueOnce(mockGetReturn);
+
+                const result = await Query
+                    .from('my_table')
+                    .find(420, 'id', 'name');
+
+                const preparedQuery = "SELECT `id`, `name` FROM `my_table` WHERE `id` = ? LIMIT ?"
+                const preparedBindings = [420, 1];
 
                 expect(result).toEqual(mockGetReturn);
                 expect(DB.prototype.get).toHaveBeenCalledOnce();

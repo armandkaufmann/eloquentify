@@ -185,6 +185,7 @@ export class Query {
     /**
      * @async
      * @param {...string|Raw|Array<string|Raw>} columns - add columns to be selected
+     * @throws TableNotSetError
      * @returns {Promise<Object|Model|null>|null}
      * @description Execute the query and get the first result.
      */
@@ -203,6 +204,18 @@ export class Query {
 
         const prepareObject = this.#buildSelectQuery();
         return await this.#database.get(prepareObject.query, prepareObject.bindings);
+    }
+
+    /**
+     * @async
+     * @param {number|string} id
+     * @param {...string|Raw|Array<string|Raw>} columns - add columns to be selected
+     * @throws TableNotSetError
+     * @returns {Promise<Object|Model|null>|null}
+     * @description Execute a query for a single record by ID.
+     */
+    async find(id, ...columns) {
+        return this.where('id', '=', id).first(...columns);
     }
 
     /**
