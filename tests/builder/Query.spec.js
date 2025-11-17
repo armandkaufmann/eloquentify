@@ -415,7 +415,7 @@ describe("QueryBuilderTest", () => {
                     const result = await new Query()
                         .from('my_table')
                         .where('test_name', '=', 'John')
-                        .whereNot([
+                        .whereNone([
                             'name',
                             'email',
                             'phone',
