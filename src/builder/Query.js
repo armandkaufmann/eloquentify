@@ -614,13 +614,6 @@ export class Query {
             return this;
         }
 
-        if (!value) {
-            value = operator;
-            operator = '=';
-        }
-
-        Validation.validateComparisonOperator(operator);
-
         this.#queryWhere.push(new Where(column, operator, value));
 
         return this;
@@ -645,13 +638,6 @@ export class Query {
             return this;
         }
 
-        if (!value) {
-            value = operator;
-            operator = '=';
-        }
-
-        Validation.validateComparisonOperator(operator);
-
         this.#queryWhere.push(new WhereNot(column, operator, value));
 
         return this;
@@ -675,13 +661,6 @@ export class Query {
             this.#queryWhere.push(column.withSeparator(Separator.Or));
             return this;
         }
-
-        if (!value) {
-            value = operator;
-            operator = '=';
-        }
-
-        Validation.validateComparisonOperator(operator);
 
         this.#queryWhere.push(new OrWhere(column, operator, value));
 

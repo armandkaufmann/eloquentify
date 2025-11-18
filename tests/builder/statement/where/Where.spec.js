@@ -1,5 +1,6 @@
 import {describe, expect, test} from 'vitest';
 import Where from "../../../../src/builder/statement/where/Where.js";
+import {InvalidComparisonOperatorError} from "../../../../src/errors/QueryBuilder/Errors.js";
 
 describe('Statement: Where', () => {
     describe('toString', () => {
@@ -13,6 +14,24 @@ describe('Statement: Where', () => {
 
            expect(result).toEqual(expectedResult);
        });
+
+        test("It throws when an invalid operator is passed in", () => {
+            const column = 'users';
+            const operator = 'sheep';
+            const value = 'John';
+
+            expect(() => new Where(column, operator, value)).toThrow(InvalidComparisonOperatorError);
+        });
+
+        test("It defaults the operator to equals if no value is passed in", () => {
+            const column = 'users';
+            const value = 'John';
+            const expectedResult = "`users` = 'John'";
+
+            const result = new Where(column, value).toString();
+
+            expect(result).toEqual(expectedResult);
+        });
 
         test("It builds with separator", () => {
             const column = 'users';
