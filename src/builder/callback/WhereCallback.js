@@ -31,6 +31,8 @@ import {Query} from "../Query.js";
 import OrWhereExists from "../statement/where/OrWhereExists.js";
 import WhereNotExists from "../statement/where/WhereNotExists.js";
 import OrWhereNotExists from "../statement/where/OrWhereNotExists.js";
+import Condition from "../../enums/Condition.js";
+import WhereNot from "../statement/where/WhereNot.js";
 
 export default class WhereCallback {
     /** @type {Group}  */
@@ -45,23 +47,16 @@ export default class WhereCallback {
 
     /**
      * @param {string|Raw} column
-     * @param {string|number} operator
+     * @param {string|number|null} [operator=null]
      * @param {string|number|null} [value=null]
      * @returns WhereCallback
      * @throws InvalidComparisonOperatorError
      */
-    where(column, operator, value = null) {
+    where(column, operator = null, value = null) {
         if (column instanceof Raw) {
             this.#query.push(column.withSeparator(Separator.And));
             return this;
         }
-
-        if (!value) {
-            value = operator;
-            operator = '=';
-        }
-
-        Validation.validateComparisonOperator(operator);
 
         this.#query.push(new Where(column, operator, value));
 
@@ -70,23 +65,35 @@ export default class WhereCallback {
 
     /**
      * @param {string|Raw} column
-     * @param {string|number} operator
+     * @param {string|number|null} [operator=null]
+     * @param {string|number|null} [value=null]
+     * @returns Query
+     * @throws InvalidComparisonOperatorError
+     * @description Add a basic where clause to the query.
+     */
+    whereNot(column, operator = null, value = null) {
+        if (column instanceof Raw) {
+            this.#query.push(column.withSeparator(Separator.And).prependStatement(Condition.Not));
+            return this;
+        }
+
+        this.#query.push(new WhereNot(column, operator, value));
+
+        return this;
+    }
+
+    /**
+     * @param {string|Raw} column
+     * @param {string|number|null} [operator=null]
      * @param {string|number|null} [value=null]
      * @returns WhereCallback
      * @throws InvalidComparisonOperatorError
      */
-    orWhere(column, operator, value = null) {
+    orWhere(column, operator = null, value = null) {
         if (column instanceof Raw) {
             this.#query.push(column.withSeparator(Separator.Or));
             return this;
         }
-
-        if (!value) {
-            value = operator;
-            operator = '=';
-        }
-
-        Validation.validateComparisonOperator(operator);
 
         this.#query.push(new OrWhere(column, operator, value));
 

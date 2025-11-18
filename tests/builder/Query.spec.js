@@ -545,12 +545,14 @@ describe("QueryBuilderTest", () => {
                                 $query
                                     .where('name', '=', 'John')
                                     .whereExists(query)
-                                    .orWhere('id', '>', 1);
+                                    .whereNot('id', '=', 21)
+                                    .orWhere('id', '>', 1)
+                                    .where('food','taco')
                             })
                             .where('age', '>', 90)
                             .get();
 
-                        const expectedResult = "SELECT * FROM `users` WHERE (`name` = 'John' AND EXISTS (SELECT 1 FROM `salary` WHERE `name` = 'John') OR `id` > 1) AND `age` > 90";
+                        const expectedResult = "SELECT * FROM `users` WHERE (`name` = 'John' AND EXISTS (SELECT 1 FROM `salary` WHERE `name` = 'John') AND NOT `id` = 21 OR `id` > 1 AND `food` = 'taco') AND `age` > 90";
 
                         expect(result).toBe(expectedResult);
                     });
