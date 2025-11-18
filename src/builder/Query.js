@@ -603,7 +603,7 @@ export class Query {
      * @throws InvalidComparisonOperatorError
      * @description Add a basic where clause to the query.
      */
-    where(column, operator, value = null) {
+    where(column, operator = null, value = null) {
         if (typeof column === "function") {
             this.#handleWhereCallback(column);
             return this;
@@ -634,7 +634,7 @@ export class Query {
      * @throws InvalidComparisonOperatorError
      * @description Add a basic where clause to the query.
      */
-    whereNot(column, operator, value = null) {
+    whereNot(column, operator = null, value = null) {
         if (typeof column === "function") {
             this.#handleWhereCallback(column, Condition.And, true);
             return this;
@@ -665,7 +665,7 @@ export class Query {
      * @throws InvalidComparisonOperatorError
      * @description Add an "or where" clause to the query.
      */
-    orWhere(column, operator, value = null) {
+    orWhere(column, operator = null, value = null) {
         if (typeof column === "function") {
             this.#handleWhereCallback(column, Separator.Or);
             return this;
