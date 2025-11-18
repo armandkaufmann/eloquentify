@@ -1516,16 +1516,22 @@ describe("QueryBuilderTest", () => {
     describe("Utility Functions", () => {
         describe("Clone", () => {
             let query;
-            const queryResult = "SELECT `id`, `name`, `classes` FROM `my_table` LEFT JOIN `comments` ON `my_table`.`id` = `comments`.`my_table_id` WHERE `name` = 'John' GROUP BY `class` HAVING `classes` > 10 ORDER BY `id` ASC LIMIT 2 OFFSET 5";
+            const queryResult = "SELECT `id`, `name`, `classes` FROM `my_table` LEFT JOIN `comments` ON `my_table`.`id` = `comments`.`my_table_id` WHERE `name` = 'John' OR (`food` = 'tacos') GROUP BY `class` HAVING (`classes` < 50) AND `classes` > 10 ORDER BY `id` ASC LIMIT 2 OFFSET 5";
 
             beforeEach(() => {
                 query = Query
                     .from('my_table')
                     .where('name', '=', 'John')
+                    .orWhere((query) => {
+                        query.where('food', '=', 'tacos')
+                    })
                     .select('id', 'name', 'classes')
                     .limit(2)
                     .groupBy('class')
                     .offset(5)
+                    .orHaving((query) => {
+                        query.having('classes', '<', 50);
+                    })
                     .leftJoin('comments', 'my_table.id', '=', 'comments.my_table_id')
                     .orderBy('id')
                     .having('classes', '>', 10);
@@ -1548,7 +1554,7 @@ describe("QueryBuilderTest", () => {
                 const queryCloneResult = await queryClone.toSql().get();
                 const originalQueryResult = await query.toSql().get();
 
-                const result = "SELECT `id`, `name`, `classes` FROM `my_table` LEFT JOIN `comments` ON `my_table`.`id` = `comments`.`my_table_id` WHERE `name` = 'John' AND `John` = 'Pork' GROUP BY `class` HAVING `classes` > 10 ORDER BY `id` ASC LIMIT 2 OFFSET 5";
+                const result = "SELECT `id`, `name`, `classes` FROM `my_table` LEFT JOIN `comments` ON `my_table`.`id` = `comments`.`my_table_id` WHERE `name` = 'John' OR (`food` = 'tacos') AND `John` = 'Pork' GROUP BY `class` HAVING (`classes` < 50) AND `classes` > 10 ORDER BY `id` ASC LIMIT 2 OFFSET 5";
 
                 expect(originalQueryResult).toEqual(result);
                 expect(originalQueryResult).not.toEqual(queryCloneResult);
