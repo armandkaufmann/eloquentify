@@ -1,5 +1,4 @@
-import {Utility} from "../../utils/Utility.js";
-import {AGGREGATE_TABLE_ALIAS, BaseAggregate} from "./BaseAggregate.js";
+import {BaseAggregate} from "./BaseAggregate.js";
 
 export class Count extends BaseAggregate {
     /**
