@@ -33,6 +33,7 @@ import WhereNotExists from "../statement/where/WhereNotExists.js";
 import OrWhereNotExists from "../statement/where/OrWhereNotExists.js";
 import Condition from "../../enums/Condition.js";
 import WhereNot from "../statement/where/WhereNot.js";
+import OrWhereNot from "../statement/where/OrWhereNot.js";
 
 export default class WhereCallback {
     /** @type {Group}  */
@@ -78,6 +79,25 @@ export default class WhereCallback {
         }
 
         this.#query.push(new WhereNot(column, operator, value));
+
+        return this;
+    }
+
+    /**
+     * @param {string|Raw} column
+     * @param {string|number|null} [operator=null]
+     * @param {string|number|null} [value=null]
+     * @returns Query
+     * @throws InvalidComparisonOperatorError
+     * @description Add a basic where clause to the query.
+     */
+    orWhereNot(column, operator = null, value = null) {
+        if (column instanceof Raw) {
+            this.#query.push(column.withSeparator(Separator.Or).prependStatement(Condition.Not));
+            return this;
+        }
+
+        this.#query.push(new OrWhereNot(column, operator, value));
 
         return this;
     }

@@ -348,8 +348,8 @@ describe("QueryBuilderTest", () => {
                 });
             });
 
-            describe("Where not", () => {
-                test("Builds where not null query string", async () => {
+            describe("Where Not/Or Where Not", () => {
+                test("Builds 'where not query' string", async () => {
                     const result = await new Query()
                         .from('my_table')
                         .where('test_name', '=', 'John')
@@ -358,6 +358,19 @@ describe("QueryBuilderTest", () => {
                         .get();
 
                     const expectedResult = "SELECT * FROM `my_table` WHERE `test_name` = 'John' AND NOT `test_id` = 420";
+
+                    expect(result).toBe(expectedResult);
+                });
+
+                test("Builds 'or where not' query string", async () => {
+                    const result = await new Query()
+                        .from('my_table')
+                        .where('test_name', '=', 'John')
+                        .orWhereNot('test_id', '=', 420)
+                        .toSql()
+                        .get();
+
+                    const expectedResult = "SELECT * FROM `my_table` WHERE `test_name` = 'John' OR NOT `test_id` = 420";
 
                     expect(result).toBe(expectedResult);
                 });
@@ -546,13 +559,14 @@ describe("QueryBuilderTest", () => {
                                     .where('name', '=', 'John')
                                     .whereExists(query)
                                     .whereNot('id', '=', 21)
+                                    .orWhereNot('flavor', '=', 'blue')
                                     .orWhere('id', '>', 1)
                                     .where('food','taco')
                             })
                             .where('age', '>', 90)
                             .get();
 
-                        const expectedResult = "SELECT * FROM `users` WHERE (`name` = 'John' AND EXISTS (SELECT 1 FROM `salary` WHERE `name` = 'John') AND NOT `id` = 21 OR `id` > 1 AND `food` = 'taco') AND `age` > 90";
+                        const expectedResult = "SELECT * FROM `users` WHERE (`name` = 'John' AND EXISTS (SELECT 1 FROM `salary` WHERE `name` = 'John') AND NOT `id` = 21 OR NOT `flavor` = 'blue' OR `id` > 1 AND `food` = 'taco') AND `age` > 90";
 
                         expect(result).toBe(expectedResult);
                     });
@@ -565,12 +579,13 @@ describe("QueryBuilderTest", () => {
                             .where(($query) => {
                                 $query
                                     .where('name', '=', 'John')
-                                    .orWhere('id', '>', 1);
+                                    .orWhere('id', '>', 1)
+                                    .orWhereNot('flavor', '=', 'blue')
                             })
                             .orWhere('position', '=', 'accountant')
                             .get();
 
-                        const expectedResult = "SELECT * FROM `users` WHERE `age` > 90 AND (`name` = 'John' OR `id` > 1) OR `position` = 'accountant'";
+                        const expectedResult = "SELECT * FROM `users` WHERE `age` > 90 AND (`name` = 'John' OR `id` > 1 OR NOT `flavor` = 'blue') OR `position` = 'accountant'";
 
                         expect(result).toBe(expectedResult);
                     });
@@ -611,8 +626,8 @@ describe("QueryBuilderTest", () => {
                     });
                 });
 
-                describe("Where Not", () => {
-                    test("It groups or where statement with callback in typical use case", async () => {
+                describe("Where Not/Or Where Not", () => {
+                    test("Where Not: It groups or where statement with callback in typical use case", async () => {
                         const result = await Query
                             .from('users')
                             .toSql()
@@ -629,11 +644,44 @@ describe("QueryBuilderTest", () => {
                         expect(result).toBe(expectedResult);
                     });
 
-                    test("It groups or where statement with callback when only single where statement", async () => {
+                    test("Or Where Not: It groups or where statement with callback in typical use case", async () => {
+                        const result = await Query
+                            .from('users')
+                            .toSql()
+                            .where('age', '>', 90)
+                            .orWhereNot(($query) => {
+                                $query
+                                    .where('name', '=', 'John')
+                                    .orWhere('id', '>', 1);
+                            })
+                            .get();
+
+                        const expectedResult = "SELECT * FROM `users` WHERE `age` > 90 OR NOT (`name` = 'John' OR `id` > 1)";
+
+                        expect(result).toBe(expectedResult);
+                    });
+
+                    test("Where Not: It groups or where statement with callback when only single where statement", async () => {
                         const result = await Query
                             .from('users')
                             .toSql()
                             .whereNot(($query) => {
+                                $query
+                                    .where('name', '=', 'John')
+                                    .orWhere('id', '>', 1);
+                            })
+                            .get();
+
+                        const expectedResult = "SELECT * FROM `users` WHERE NOT (`name` = 'John' OR `id` > 1)";
+
+                        expect(result).toBe(expectedResult);
+                    });
+
+                    test("Or Where Not: It groups or where statement with callback when only single where statement", async () => {
+                        const result = await Query
+                            .from('users')
+                            .toSql()
+                            .orWhereNot(($query) => {
                                 $query
                                     .where('name', '=', 'John')
                                     .orWhere('id', '>', 1);
@@ -1492,6 +1540,19 @@ describe("QueryBuilderTest", () => {
                         .get();
 
                     const expectedResult = "SELECT * FROM `my_table` WHERE `test_id` = 5 AND NOT nationality LIKE %alien%";
+
+                    expect(result).toBe(expectedResult);
+                });
+
+                test("Insert raw statement: OrWhereNot", async () => {
+                    const result = await new Query()
+                        .from('my_table')
+                        .where('test_id', '=', 5)
+                        .orWhereNot(Query.raw("nationality LIKE %alien%"))
+                        .toSql()
+                        .get();
+
+                    const expectedResult = "SELECT * FROM `my_table` WHERE `test_id` = 5 OR NOT nationality LIKE %alien%";
 
                     expect(result).toBe(expectedResult);
                 });
