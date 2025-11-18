@@ -30,4 +30,14 @@ export default class Raw extends Base {
 
         return this;
     }
+
+    /**
+     * @param {String} string
+     * @returns Raw
+     */
+    prependStatement(string) {
+        this._query = `${string} ${this._query}`;
+
+        return this;
+    }
 }

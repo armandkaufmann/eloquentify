@@ -10,6 +10,7 @@
  * @property {'NOT IN'} NotIn
  * @property {'EXISTS'} Exists
  * @property {'NOT EXISTS'} NotExists
+ * @property {'NOT'} Not
  */
 
 /** @type Condition **/
@@ -23,7 +24,8 @@ const Condition = {
     In: 'IN',
     NotIn: 'NOT IN',
     Exists: 'EXISTS',
-    NotExists: 'NOT EXISTS'
+    NotExists: 'NOT EXISTS',
+    Not: 'NOT'
 }
 
 export default Condition;

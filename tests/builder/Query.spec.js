@@ -334,7 +334,7 @@ describe("QueryBuilderTest", () => {
                     expect(result).toBe(expectedResult);
                 });
 
-                test("Builds where null query string", async () => {
+                test("Builds where not null query string", async () => {
                     const result = await new Query()
                         .from('my_table')
                         .where('test_name', '=', 'John')
@@ -343,6 +343,21 @@ describe("QueryBuilderTest", () => {
                         .get();
 
                     const expectedResult = "SELECT * FROM `my_table` WHERE `test_name` = 'John' AND `test_id` IS NOT NULL";
+
+                    expect(result).toBe(expectedResult);
+                });
+            });
+
+            describe("Where not", () => {
+                test("Builds where not null query string", async () => {
+                    const result = await new Query()
+                        .from('my_table')
+                        .where('test_name', '=', 'John')
+                        .whereNot('test_id', '=', 420)
+                        .toSql()
+                        .get();
+
+                    const expectedResult = "SELECT * FROM `my_table` WHERE `test_name` = 'John' AND NOT `test_id` = 420";
 
                     expect(result).toBe(expectedResult);
                 });
@@ -592,7 +607,42 @@ describe("QueryBuilderTest", () => {
 
                         expect(result).toBe(expectedResult);
                     });
-                })
+                });
+
+                describe("Where Not", () => {
+                    test("It groups or where statement with callback in typical use case", async () => {
+                        const result = await Query
+                            .from('users')
+                            .toSql()
+                            .where('age', '>', 90)
+                            .whereNot(($query) => {
+                                $query
+                                    .where('name', '=', 'John')
+                                    .orWhere('id', '>', 1);
+                            })
+                            .get();
+
+                        const expectedResult = "SELECT * FROM `users` WHERE `age` > 90 AND NOT (`name` = 'John' OR `id` > 1)";
+
+                        expect(result).toBe(expectedResult);
+                    });
+
+                    test("It groups or where statement with callback when only single where statement", async () => {
+                        const result = await Query
+                            .from('users')
+                            .toSql()
+                            .whereNot(($query) => {
+                                $query
+                                    .where('name', '=', 'John')
+                                    .orWhere('id', '>', 1);
+                            })
+                            .get();
+
+                        const expectedResult = "SELECT * FROM `users` WHERE NOT (`name` = 'John' OR `id` > 1)";
+
+                        expect(result).toBe(expectedResult);
+                    });
+                });
             });
 
             describe("Where between/not between", () => {
@@ -1425,6 +1475,21 @@ describe("QueryBuilderTest", () => {
                         .get();
 
                     const expectedResult = "SELECT * FROM `my_table` WHERE `test_id` = 5 OR nationality LIKE %alien%";
+
+                    expect(result).toBe(expectedResult);
+                });
+            });
+
+            describe("WhereNot", () => {
+                test("Insert raw statement: WhereNot", async () => {
+                    const result = await new Query()
+                        .from('my_table')
+                        .where('test_id', '=', 5)
+                        .whereNot(Query.raw("nationality LIKE %alien%"))
+                        .toSql()
+                        .get();
+
+                    const expectedResult = "SELECT * FROM `my_table` WHERE `test_id` = 5 AND NOT nationality LIKE %alien%";
 
                     expect(result).toBe(expectedResult);
                 });

@@ -66,6 +66,7 @@ import {Sum} from "./aggregates/Sum.js";
 import {Average} from "./aggregates/Average.js";
 import {Min} from "./aggregates/Min.js";
 import {Max} from "./aggregates/Max.js";
+import WhereNot from "./statement/where/WhereNot.js";
 
 export class Query {
     /** @type {?string} */
@@ -596,7 +597,7 @@ export class Query {
 
     /**
      * @param {string|{(query: WhereCallback)}|Raw} column
-     * @param {string|number} operator
+     * @param {string|number|null} [operator=null]
      * @param {string|number|null} [value=null]
      * @returns Query
      * @throws InvalidComparisonOperatorError
@@ -627,7 +628,38 @@ export class Query {
 
     /**
      * @param {string|{(query: WhereCallback)}|Raw} column
-     * @param {string|number} operator
+     * @param {string|number|null} [operator=null]
+     * @param {string|number|null} [value=null]
+     * @returns Query
+     * @throws InvalidComparisonOperatorError
+     * @description Add a basic where clause to the query.
+     */
+    whereNot(column, operator, value = null) {
+        if (typeof column === "function") {
+            this.#handleWhereCallback(column, Condition.And, true);
+            return this;
+        }
+
+        if (column instanceof Raw) {
+            this.#queryWhere.push(column.withSeparator(Separator.And).prependStatement(Condition.Not));
+            return this;
+        }
+
+        if (!value) {
+            value = operator;
+            operator = '=';
+        }
+
+        Validation.validateComparisonOperator(operator);
+
+        this.#queryWhere.push(new WhereNot(column, operator, value));
+
+        return this;
+    }
+
+    /**
+     * @param {string|{(query: WhereCallback)}|Raw} column
+     * @param {string|number|null} [operator=null]
      * @param {string|number|null} [value=null]
      * @returns Query
      * @throws InvalidComparisonOperatorError
@@ -1239,10 +1271,11 @@ export class Query {
     /**
      * @param {{(query: WhereCallback)}} callback
      * @param {"AND"|"OR"} [condition="AND"]
+     * @param {boolean} [not=false]
      * @returns void
      */
-    #handleWhereCallback(callback, condition = Condition.And) {
-        const group = new Group(condition);
+    #handleWhereCallback(callback, condition = Condition.And, not = false) {
+        const group = new Group(condition, not ? Condition.Not : null);
         const whereCallback = new WhereCallback(group);
 
         callback(whereCallback);

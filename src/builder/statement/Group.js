@@ -6,13 +6,17 @@ import Condition from "../../enums/Condition.js";
 export default class Group extends Builder {
     /** @type {"AND"|"OR"} */
     _condition = Condition.And;
+    /** @type {string|null} */
+    _prependString = null;
 
     /**
      * @param {"AND"|"OR"} [condition="AND"]
+     * @param {string|null} [prependString=null]
      */
-    constructor(condition = Condition.And) {
+    constructor(condition = Condition.And, prependString = null) {
         super(STATEMENTS.none);
         this._condition = condition;
+        this._prependString = prependString;
     }
 
     /**
@@ -24,6 +28,10 @@ export default class Group extends Builder {
 
         if (query) {
             query = `(${query})`;
+        }
+
+        if (this._prependString) {
+            query = `${this._prependString} ${query}`;
         }
 
         if (withCondition && query) {
@@ -66,6 +74,7 @@ export default class Group extends Builder {
         return {
             ...parentAttributes,
             condition: this._condition,
+            prependString: this._prependString
         };
     }
 
@@ -75,6 +84,7 @@ export default class Group extends Builder {
     _hydrate(attributes) {
         super._hydrate(attributes);
         this._condition = attributes?.condition ?? this._condition;
+        this._prependString = attributes?.prependString ?? this._prependString;
     }
 
 }
