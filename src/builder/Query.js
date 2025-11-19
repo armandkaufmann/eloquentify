@@ -598,8 +598,8 @@ export class Query {
 
     /**
      * @param {string|{(query: WhereCallback)}|Raw} column
-     * @param {string|number|null} [operator=null]
-     * @param {string|number|null} [value=null]
+     * @param {string|number|null|boolean} [operator=null]
+     * @param {string|number|null|boolean} [value=null]
      * @returns Query
      * @throws InvalidComparisonOperatorError
      * @description Add a basic where clause to the query.
@@ -622,8 +622,8 @@ export class Query {
 
     /**
      * @param {string|{(query: WhereCallback)}|Raw} column
-     * @param {string|number|null} [operator=null]
-     * @param {string|number|null} [value=null]
+     * @param {string|number|null|boolean} [operator=null]
+     * @param {string|number|null|boolean} [value=null]
      * @returns Query
      * @throws InvalidComparisonOperatorError
      * @description Add a basic "where not" clause to the query.
@@ -646,8 +646,8 @@ export class Query {
 
     /**
      * @param {string|{(query: WhereCallback)}|Raw} column
-     * @param {string|number|null} [operator=null]
-     * @param {string|number|null} [value=null]
+     * @param {string|number|null|boolean} [operator=null]
+     * @param {string|number|null|boolean} [value=null]
      * @returns Query
      * @throws InvalidComparisonOperatorError
      * @description Add a basic "or where not" clause to the query.
@@ -821,9 +821,9 @@ export class Query {
     /**
      * @param {Array<String>} columns
      * @param {String} operator
-     * @param {String|number} value
+     * @param {String|number|boolean} value
      * @returns Query
-     * @description Add an "where" clause to the query for multiple columns with "or" conditions between them.
+     * @description Add a "where" clause to the query for multiple columns with "or" conditions between them.
      */
     whereAny(columns, operator, value) {
         this.#queryWhere.push(new WhereAny(columns, operator, value));
@@ -834,7 +834,7 @@ export class Query {
     /**
      * @param {Array<String>} columns
      * @param {String} operator
-     * @param {String|number} value
+     * @param {String|number|boolean} value
      * @returns Query
      * @description Add a "where" clause to the query for multiple columns with "and" conditions between them.
      */
@@ -847,7 +847,7 @@ export class Query {
     /**
      * @param {Array<String>} columns
      * @param {String} operator
-     * @param {String|number} value
+     * @param {String|number|boolean} value
      * @returns Query
      * @description Add an "where" clause to the query for multiple columns with "or" conditions between them that don't match the condition
      */
@@ -1097,13 +1097,13 @@ export class Query {
 
     /**
      * @param {string|{(query: HavingCallback)}|Raw} column
-     * @param {string|number} operator
-     * @param {string|number|null} [value=null]
+     * @param {string|number|null|boolean} [operator=null]
+     * @param {string|number|null|boolean} [value=null]
      * @returns Query
      * @throws InvalidComparisonOperatorError
      * @description Add a "having" clause to the query.
      */
-    having(column, operator, value = null) {
+    having(column, operator = null, value = null) {
         if (typeof column === "function") {
             this.#handleHavingCallback(column);
             return this;
@@ -1128,13 +1128,13 @@ export class Query {
 
     /**
      * @param {string|{(query: HavingCallback)}|Raw} column
-     * @param {string|number} operator
-     * @param {string|number|null} [value=null]
+     * @param {string|number|null|boolean} [operator=null]
+     * @param {string|number|null|boolean} [value=null]
      * @returns Query
      * @throws InvalidComparisonOperatorError
      * @description Add an "or having" clause to the query.
      */
-    orHaving(column, operator, value = null) {
+    orHaving(column, operator = null, value = null) {
         if (typeof column === "function") {
             this.#handleHavingCallback(column, "OR");
             return this;
