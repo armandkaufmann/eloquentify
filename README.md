@@ -2,6 +2,8 @@
 
 A JavaScript ORM inspired by Laravel's Eloquent, providing an intuitive and fluent interface for interacting with SQLite databases.
 
+[Read documentation here.](https://github.com/armandkaufmann/eloquentify/wiki)
+
 ## Overview
 
 Eloquent JS is a lightweight Object-Relational Mapping (ORM) library that brings Laravel Eloquent's elegant syntax to JavaScript/Node.js. It features a powerful query builder, automatic table name generation, and a simple configuration system.
