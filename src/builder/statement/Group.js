@@ -5,14 +5,18 @@ import Condition from "../../enums/Condition.js";
 
 export default class Group extends Builder {
     /** @type {"AND"|"OR"} */
-    #condition = Condition.And;
+    _condition = Condition.And;
+    /** @type {string|null} */
+    _prependString = null;
 
     /**
      * @param {"AND"|"OR"} [condition="AND"]
+     * @param {string|null} [prependString=null]
      */
-    constructor(condition = Condition.And) {
+    constructor(condition = Condition.And, prependString = null) {
         super(STATEMENTS.none);
-        this.#condition = condition;
+        this._condition = condition;
+        this._prependString = prependString;
     }
 
     /**
@@ -26,8 +30,12 @@ export default class Group extends Builder {
             query = `(${query})`;
         }
 
+        if (this._prependString) {
+            query = `${this._prependString} ${query}`;
+        }
+
         if (withCondition && query) {
-            query = `${this.#condition} ${query}`;
+            query = `${this._condition} ${query}`;
         }
 
         return query;
@@ -45,9 +53,38 @@ export default class Group extends Builder {
         }
 
         if (withCondition && prepareObject.query) {
-            prepareObject.query = `${this.#condition} ${prepareObject.query}`;
+            prepareObject.query = `${this._condition} ${prepareObject.query}`;
         }
 
         return prepareObject;
     }
+
+    /**
+     * @return Group
+     */
+    clone() {
+        return this._clone(new Group(this._condition))
+    }
+
+    /**
+     * @returns Object
+     */
+    _getAttributes() {
+        const parentAttributes = super._getAttributes();
+        return {
+            ...parentAttributes,
+            condition: this._condition,
+            prependString: this._prependString
+        };
+    }
+
+    /**
+     * @param {Object} attributes
+     */
+    _hydrate(attributes) {
+        super._hydrate(attributes);
+        this._condition = attributes?.condition ?? this._condition;
+        this._prependString = attributes?.prependString ?? this._prependString;
+    }
+
 }

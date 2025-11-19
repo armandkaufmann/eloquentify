@@ -2,23 +2,23 @@ import {STATEMENTS} from "./Base.js";
 
 export default class Builder {
     /** @type {Array<Base|Group>} */
-    #statements = [];
+    _statements = [];
     /** @type {Statement} */
-    #type;
+    _type;
     /** @type {Boolean} */
-    #withStatement;
+    _withStatement;
     /** @type {string|null} */
-    #defaultQueryPartial = null;
+    _defaultQueryPartial = null;
     /** @type {string} */
-    #glue = " ";
+    _glue = " ";
     /** @type {Boolean} */
-    #withDistinct = false;
+    _withDistinct = false;
 
     /**
      * @param {Statement} type
      */
     constructor(type) {
-        this.#type = type;
+        this._type = type;
         this.#parseType();
         this.#prepareBuilder();
     }
@@ -29,12 +29,12 @@ export default class Builder {
      */
     push(statement) {
         if (this.#isNotAppendable()) {
-            this.#statements = [statement];
+            this._statements = [statement];
 
             return this;
         }
 
-        this.#statements.push(statement);
+        this._statements.push(statement);
 
         return this;
     }
@@ -44,14 +44,14 @@ export default class Builder {
      * @return String
      */
     toString(withCondition = true) {
-        if (this.#defaultQueryPartial && this.#statements.length === 0) {
-            return this.#formatFullStatement(this.#defaultQueryPartial);
+        if (this._defaultQueryPartial && this._statements.length === 0) {
+            return this.#formatFullStatement(this._defaultQueryPartial);
         }
 
-        let result = this.#statements
+        let result = this._statements
             .filter((statement) => statement.toString(false))
             .map((statement, index) => statement.toString(index !== 0))
-            .join(this.#glue);
+            .join(this._glue);
 
         if (result) {
             result = this.#formatFullStatement(result);
@@ -65,16 +65,16 @@ export default class Builder {
      * @return PrepareObject
      */
     prepare(withCondition = true) {
-        if (this.#defaultQueryPartial && this.#statements.length === 0) {
-            return {query: this.#formatFullStatement(this.#defaultQueryPartial), bindings: []};
+        if (this._defaultQueryPartial && this._statements.length === 0) {
+            return {query: this.#formatFullStatement(this._defaultQueryPartial), bindings: []};
         }
 
         /** @type {PrepareObject} */
-        let result = this.#statements
+        let result = this._statements
             .reduce((result, statement, index) => {
                 const prepare = statement.prepare(index !== 0);
 
-                result.query += `${index > 0 ? this.#glue : ''}${prepare.query}`;
+                result.query += `${index > 0 ? this._glue : ''}${prepare.query}`;
                 result.bindings.push(...prepare.bindings);
 
                 return result;
@@ -91,15 +91,15 @@ export default class Builder {
     }
 
     setDistinct() {
-        if (this.#type !== STATEMENTS.select) {
+        if (this._type !== STATEMENTS.select) {
             throw new Error("Can not set distinct in a non-select statement builder.")
         }
 
-        this.#withDistinct = true;
+        this._withDistinct = true;
     }
 
     toggleWithStatement(withStatement) {
-        this.#withStatement = withStatement;
+        this._withStatement = withStatement;
 
         return this;
     }
@@ -108,46 +108,58 @@ export default class Builder {
      * @return Builder
      */
     clone() {
-        const clone = new Builder(this.#type);
-        clone._hydrate(
-            this.#statements.map((statement) => statement.clone()),
-            this.#type,
-            this.#withStatement,
-            this.#defaultQueryPartial,
-            this.#glue,
-            this.#withDistinct,
-        );
-
-        return clone;
+        return this._clone(new Builder(this._type));
     }
 
     /**
      * @return Boolean
      */
     isEmpty() {
-        return this.#statements.length === 0;
+        return this._statements.length === 0;
     }
 
     /**
-     * @param {Array<Base|Group>} statements
-     * @param {Boolean} type
-     * @param {Boolean} withStatement
-     * @param {string|null} defaultQueryPartial
-     * @param {string} glue
-     * @param {Boolean} withDistinct
-     * @return Builder
+     * @template T
+     * @param {T} newClass
+     * @return {T}
      */
-    _hydrate(statements, type, withStatement, defaultQueryPartial, glue, withDistinct) {
-        this.#statements = statements;
-        this.#type = type;
-        this.#withStatement = withStatement;
-        this.#defaultQueryPartial = defaultQueryPartial;
-        this.#glue = glue;
-        this.#withDistinct = withDistinct;
+    _clone(newClass) {
+        const attributes = this._getAttributes();
+
+        attributes.statements = attributes.statements.map((statement) => statement.clone());
+        newClass._hydrate(attributes);
+
+        return newClass;
+    }
+
+    /**
+     * @returns Object
+     */
+    _getAttributes() {
+        return {
+            statements: this._statements,
+            type: this._type,
+            withStatement: this._withStatement,
+            defaultQueryPartial: this._defaultQueryPartial,
+            glue: this._glue,
+            withDistinct: this._withDistinct,
+        };
+    }
+
+    /**
+     * @param {Object} attributes
+     */
+    _hydrate(attributes) {
+        this._statements = attributes?.statements ?? this._statements;
+        this._type = attributes?.type ?? this._type;
+        this._withStatement = attributes?.withStatement ?? this._withStatement;
+        this._defaultQueryPartial = attributes?.defaultQueryPartial ?? this._defaultQueryPartial;
+        this._glue = attributes?.glue ?? this._glue;
+        this._withDistinct = attributes?.withDistinct ?? this._withDistinct;
     }
 
     #isNotAppendable() {
-        return this.#type === STATEMENTS.limit || this.#type === STATEMENTS.offset;
+        return this._type === STATEMENTS.limit || this._type === STATEMENTS.offset;
     }
 
     /**
@@ -157,11 +169,11 @@ export default class Builder {
     #formatFullStatement(query) {
         let result = "";
 
-        if (this.#withStatement) {
-            result += `${this.#type} `;
+        if (this._withStatement) {
+            result += `${this._type} `;
         }
 
-        if (this.#withDistinct && query !== this.#defaultQueryPartial) {
+        if (this._withDistinct && query !== this._defaultQueryPartial) {
             result += 'DISTINCT '
         }
 
@@ -169,25 +181,25 @@ export default class Builder {
     }
 
     #parseType() {
-        switch (this.#type) {
+        switch (this._type) {
             case STATEMENTS.join:
             case STATEMENTS.none:
-                this.#withStatement = false;
+                this._withStatement = false;
                 break;
             default:
-                this.#withStatement = true;
+                this._withStatement = true;
         }
     }
 
     #prepareBuilder() {
-        switch (this.#type) {
+        switch (this._type) {
             case STATEMENTS.select:
-                this.#defaultQueryPartial = '*';
-                this.#glue = "";
+                this._defaultQueryPartial = '*';
+                this._glue = "";
                 break;
             case STATEMENTS.orderBy:
             case STATEMENTS.group:
-                this.#glue = "";
+                this._glue = "";
                 break;
             default:
                 break;

@@ -6,9 +6,9 @@ export default class OrWhere extends Where {
     /**
      * @param {string} column
      * @param {string} operator
-     * @param {string|number} value
+     * @param {string|number|null} [value=null]
      */
-    constructor(column, operator, value) {
+    constructor(column, operator, value = null) {
         super(column, operator, value, Separator.Or);
     }
 }

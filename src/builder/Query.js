@@ -66,6 +66,8 @@ import {Sum} from "./aggregates/Sum.js";
 import {Average} from "./aggregates/Average.js";
 import {Min} from "./aggregates/Min.js";
 import {Max} from "./aggregates/Max.js";
+import WhereNot from "./statement/where/WhereNot.js";
+import OrWhereNot from "./statement/where/OrWhereNot.js";
 
 export class Query {
     /** @type {?string} */
@@ -596,13 +598,13 @@ export class Query {
 
     /**
      * @param {string|{(query: WhereCallback)}|Raw} column
-     * @param {string|number} operator
+     * @param {string|number|null} [operator=null]
      * @param {string|number|null} [value=null]
      * @returns Query
      * @throws InvalidComparisonOperatorError
      * @description Add a basic where clause to the query.
      */
-    where(column, operator, value = null) {
+    where(column, operator = null, value = null) {
         if (typeof column === "function") {
             this.#handleWhereCallback(column);
             return this;
@@ -613,13 +615,6 @@ export class Query {
             return this;
         }
 
-        if (!value) {
-            value = operator;
-            operator = '=';
-        }
-
-        Validation.validateComparisonOperator(operator);
-
         this.#queryWhere.push(new Where(column, operator, value));
 
         return this;
@@ -627,13 +622,61 @@ export class Query {
 
     /**
      * @param {string|{(query: WhereCallback)}|Raw} column
-     * @param {string|number} operator
+     * @param {string|number|null} [operator=null]
+     * @param {string|number|null} [value=null]
+     * @returns Query
+     * @throws InvalidComparisonOperatorError
+     * @description Add a basic "where not" clause to the query.
+     */
+    whereNot(column, operator = null, value = null) {
+        if (typeof column === "function") {
+            this.#handleWhereCallback(column, Condition.And, true);
+            return this;
+        }
+
+        if (column instanceof Raw) {
+            this.#queryWhere.push(column.withSeparator(Separator.And).prependStatement(Condition.Not));
+            return this;
+        }
+
+        this.#queryWhere.push(new WhereNot(column, operator, value));
+
+        return this;
+    }
+
+    /**
+     * @param {string|{(query: WhereCallback)}|Raw} column
+     * @param {string|number|null} [operator=null]
+     * @param {string|number|null} [value=null]
+     * @returns Query
+     * @throws InvalidComparisonOperatorError
+     * @description Add a basic "or where not" clause to the query.
+     */
+    orWhereNot(column, operator = null, value = null) {
+        if (typeof column === "function") {
+            this.#handleWhereCallback(column, Condition.Or, true);
+            return this;
+        }
+
+        if (column instanceof Raw) {
+            this.#queryWhere.push(column.withSeparator(Separator.Or).prependStatement(Condition.Not));
+            return this;
+        }
+
+        this.#queryWhere.push(new OrWhereNot(column, operator, value));
+
+        return this;
+    }
+
+    /**
+     * @param {string|{(query: WhereCallback)}|Raw} column
+     * @param {string|number|null} [operator=null]
      * @param {string|number|null} [value=null]
      * @returns Query
      * @throws InvalidComparisonOperatorError
      * @description Add an "or where" clause to the query.
      */
-    orWhere(column, operator, value = null) {
+    orWhere(column, operator = null, value = null) {
         if (typeof column === "function") {
             this.#handleWhereCallback(column, Separator.Or);
             return this;
@@ -643,13 +686,6 @@ export class Query {
             this.#queryWhere.push(column.withSeparator(Separator.Or));
             return this;
         }
-
-        if (!value) {
-            value = operator;
-            operator = '=';
-        }
-
-        Validation.validateComparisonOperator(operator);
 
         this.#queryWhere.push(new OrWhere(column, operator, value));
 
@@ -813,7 +849,7 @@ export class Query {
      * @param {String} operator
      * @param {String|number} value
      * @returns Query
-     * @description Add a basic "where not" clause to the query.
+     * @description Add an "where" clause to the query for multiple columns with "or" conditions between them that don't match the condition
      */
     whereNone(columns, operator, value) {
         this.#queryWhere.push(new WhereNone(columns, operator, value));
@@ -1239,10 +1275,11 @@ export class Query {
     /**
      * @param {{(query: WhereCallback)}} callback
      * @param {"AND"|"OR"} [condition="AND"]
+     * @param {boolean} [not=false]
      * @returns void
      */
-    #handleWhereCallback(callback, condition = Condition.And) {
-        const group = new Group(condition);
+    #handleWhereCallback(callback, condition = Condition.And, not = false) {
+        const group = new Group(condition, not ? Condition.Not : null);
         const whereCallback = new WhereCallback(group);
 
         callback(whereCallback);

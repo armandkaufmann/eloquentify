@@ -3,7 +3,7 @@ import {Utility} from "../../../utils/Utility.js";
 import Separator from "../../../enums/Separator.js";
 import Validation from "../../../utils/Validation.js";
 
-export default class Where extends Base {
+export default class WhereNot extends Base {
 
     /**
      * @param {String} column
@@ -19,7 +19,7 @@ export default class Where extends Base {
 
         Validation.validateComparisonOperator(operator);
 
-        const query = `${Utility.escapeColumnString(column)} ${operator} ?`;
+        const query = `NOT ${Utility.escapeColumnString(column)} ${operator} ?`;
         const bindings = [value];
 
         super(bindings, query, separator);
