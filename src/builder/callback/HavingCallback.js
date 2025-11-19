@@ -21,12 +21,12 @@ export default class HavingCallback {
 
     /**
      * @param {string|Raw} column
-     * @param {string|number} operator
-     * @param {string|number|null} [value=null]
+     * @param {string|number|null|boolean} [operator=null]
+     * @param {string|number|null|boolean} [value=null]
      * @returns HavingCallback
      * @throws InvalidComparisonOperatorError
      */
-    having(column, operator, value = null) {
+    having(column, operator = null, value = null) {
         if (column instanceof Raw) {
             this.#query.push(column.withSeparator(Separator.And));
             return this;
@@ -46,12 +46,12 @@ export default class HavingCallback {
 
     /**
      * @param {string|Raw} column
-     * @param {string|number} operator
-     * @param {string|number|null} [value=null]
+     * @param {string|number|null|boolean} [operator=null]
+     * @param {string|number|null|boolean} [value=null]
      * @returns HavingCallback
      * @throws InvalidComparisonOperatorError
      */
-    orHaving(column, operator, value = null) {
+    orHaving(column, operator= null, value = null) {
         if (column instanceof Raw) {
             this.#query.push(column.withSeparator(Separator.Or));
             return this;

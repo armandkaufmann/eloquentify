@@ -48,8 +48,8 @@ export default class WhereCallback {
 
     /**
      * @param {string|Raw} column
-     * @param {string|number|null} [operator=null]
-     * @param {string|number|null} [value=null]
+     * @param {string|number|null|boolean} [operator=null]
+     * @param {string|number|null|boolean} [value=null]
      * @returns WhereCallback
      * @throws InvalidComparisonOperatorError
      */
@@ -66,8 +66,8 @@ export default class WhereCallback {
 
     /**
      * @param {string|Raw} column
-     * @param {string|number|null} [operator=null]
-     * @param {string|number|null} [value=null]
+     * @param {string|number|null|boolean} [operator=null]
+     * @param {string|number|null|boolean} [value=null]
      * @returns Query
      * @throws InvalidComparisonOperatorError
      * @description Add a basic where clause to the query.
@@ -85,8 +85,8 @@ export default class WhereCallback {
 
     /**
      * @param {string|Raw} column
-     * @param {string|number|null} [operator=null]
-     * @param {string|number|null} [value=null]
+     * @param {string|number|null|boolean} [operator=null]
+     * @param {string|number|null|boolean} [value=null]
      * @returns Query
      * @throws InvalidComparisonOperatorError
      * @description Add a basic where clause to the query.
@@ -104,8 +104,8 @@ export default class WhereCallback {
 
     /**
      * @param {string|Raw} column
-     * @param {string|number|null} [operator=null]
-     * @param {string|number|null} [value=null]
+     * @param {string|number|null|boolean} [operator=null]
+     * @param {string|number|null|boolean} [value=null]
      * @returns WhereCallback
      * @throws InvalidComparisonOperatorError
      */
