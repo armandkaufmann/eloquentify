@@ -45,6 +45,16 @@ export class BaseAggregate {
     /**
      * @return string
      */
+    toString() {
+        const columnString = this.buildColumn();
+        const baseQueryPrepare = this._baseQuery.toString();
+
+        return `SELECT ${this._method}(${columnString}) AS ${AGGREGATE_COLUMN_ALIAS} FROM (${baseQueryPrepare}) AS ${AGGREGATE_TABLE_ALIAS}`;
+    }
+
+    /**
+     * @return string
+     */
     buildColumn() {
         return `${AGGREGATE_TABLE_ALIAS}.${Utility.escapeColumnString(this._column)}`;
     }

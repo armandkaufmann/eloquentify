@@ -561,7 +561,7 @@ describe("QueryBuilderTest", () => {
                                     .whereNot('id', '=', 21)
                                     .orWhereNot('flavor', '=', 'blue')
                                     .orWhere('id', '>', 1)
-                                    .where('food','taco')
+                                    .where('food', 'taco')
                             })
                             .where('age', '>', 90)
                             .get();
@@ -1638,6 +1638,96 @@ describe("QueryBuilderTest", () => {
 
                 expect(result).toBe("DELETE FROM users WHERE `name` = 'john' ORDER BY `name` ASC LIMIT 1");
             })
+        });
+
+        describe("Aggregates", () => {
+            describe("Count", () => {
+                test("It builds query without specified column", async () => {
+                    const expectedQuery = "SELECT COUNT(*) AS aggregate FROM (SELECT * FROM `users` WHERE `id` > 20) AS temp_table";
+
+                    const result = await Query
+                        .toSql()
+                        .from('users')
+                        .where('id', '>', 20)
+                        .count();
+
+                    expect(DB.prototype.all).not.toHaveBeenCalledOnce();
+                    expect(result).toEqual(expectedQuery);
+                });
+
+                test("It builds query with specified column", async () => {
+                    const expectedQuery = "SELECT COUNT(temp_table.`id`) AS aggregate FROM (SELECT * FROM `users` WHERE `id` > 20) AS temp_table";
+
+                    const result = await Query
+                        .toSql()
+                        .from('users')
+                        .where('id', '>', 20)
+                        .count('id');
+
+                    expect(DB.prototype.all).not.toHaveBeenCalledOnce();
+                    expect(result).toEqual(expectedQuery);
+                });
+            });
+
+            describe("Sum", () => {
+                test("It builds query with specified column", async () => {
+                    const expectedQuery = "SELECT SUM(temp_table.`purchase_count`) AS aggregate FROM (SELECT * FROM `users` WHERE `id` > 20) AS temp_table";
+
+                    const result = await Query
+                        .toSql()
+                        .from('users')
+                        .where('id', '>', 20)
+                        .sum('purchase_count');
+
+                    expect(DB.prototype.all).not.toHaveBeenCalledOnce();
+                    expect(result).toEqual(expectedQuery);
+                });
+            });
+
+            describe("Average", () => {
+                test("Avg: It builds query with specified column", async () => {
+                    const expectedQuery = "SELECT AVG(temp_table.`purchase_count`) AS aggregate FROM (SELECT * FROM `users` WHERE `id` > 20) AS temp_table";
+
+                    const result = await Query
+                        .toSql()
+                        .from('users')
+                        .where('id', '>', 20)
+                        .avg('purchase_count');
+
+                    expect(DB.prototype.all).not.toHaveBeenCalledOnce();
+                    expect(result).toEqual(expectedQuery);
+                });
+            });
+
+            describe("Min", () => {
+                test("It builds query with specified column", async () => {
+                    const expectedQuery = "SELECT MIN(temp_table.`purchase_count`) AS aggregate FROM (SELECT * FROM `users` WHERE `id` > 20) AS temp_table";
+
+                    const result = await Query
+                        .toSql()
+                        .from('users')
+                        .where('id', '>', 20)
+                        .min('purchase_count');
+
+                    expect(DB.prototype.all).not.toHaveBeenCalledOnce();
+                    expect(result).toEqual(expectedQuery);
+                });
+            });
+
+            describe("Max", () => {
+                test("It builds query with specified column", async () => {
+                    const expectedQuery = "SELECT MAX(temp_table.`purchase_count`) AS aggregate FROM (SELECT * FROM `users` WHERE `id` > 20) AS temp_table";
+
+                    const result = await Query
+                        .toSql()
+                        .from('users')
+                        .where('id', '>', 20)
+                        .max('purchase_count');
+
+                    expect(DB.prototype.all).not.toHaveBeenCalledOnce();
+                    expect(result).toEqual(expectedQuery);
+                });
+            });
         });
     });
 

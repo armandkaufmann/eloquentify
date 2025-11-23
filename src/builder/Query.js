@@ -177,7 +177,7 @@ export class Query {
         }
 
         if (this.#toSql) {
-            return this.#buildSelectQuery();
+            return this.#buildSelectQuery(true);
         }
 
         const prepareObject = this.#buildSelectQuery();
@@ -201,7 +201,7 @@ export class Query {
         }
 
         if (this.#toSql) {
-            return this.#buildSelectQuery();
+            return this.#buildSelectQuery(true);
         }
 
         const prepareObject = this.#buildSelectQuery();
@@ -294,18 +294,33 @@ export class Query {
     async _aggregate(aggregateClass, column) {
         //todo: check for unions too
         const clone = this.cloneWithout(this.#queryHaving.isEmpty() ? 'select' : '');
-        const countAggregation = new aggregateClass(clone, column).prepare();
+        const aggregation = new aggregateClass(clone, column);
 
-        const dbResult = await this.#database.all(countAggregation.query, countAggregation.bindings);
+        if (this.#toSql) {
+            return aggregation.toString();
+        }
+
+        const aggregationPrepareObject = aggregation.prepare();
+
+        const dbResult = await this.#database.all(aggregationPrepareObject.query, aggregationPrepareObject.bindings);
 
         return dbResult[0]?.aggregate ?? 0;
     }
 
     /**
      * @returns PrepareObject
+     * @description Returns a prepare object for a select query.
      */
     prepare() {
         return this.#buildSelectQuery();
+    }
+
+    /**
+     * @returns string
+     * @description Returns a string for a select query.
+     */
+    toString() {
+        return this.#buildSelectQuery(true);
     }
 
     /**
@@ -1440,9 +1455,10 @@ export class Query {
     }
 
     /**
+     * @param {boolean} [toString=false]
      * @returns PrepareObject|string
      */
-    #buildSelectQuery() {
+    #buildSelectQuery(toString = false) {
         const queryCollection = [
             this.#querySelect, this.#queryFrom,
             this.#queryJoin, this.#queryWhere,
@@ -1452,14 +1468,14 @@ export class Query {
         ];
 
         const queries = queryCollection.map((query) => {
-            if (this.#toSql) {
+            if (toString) {
                 return query.toString();
             }
 
             return query.prepare();
         });
 
-        if (this.#toSql) {
+        if (toString) {
             return this.#joinQueryStrings(queries);
         }
 
