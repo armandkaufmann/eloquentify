@@ -8,11 +8,4 @@ export class Sum extends BaseAggregate {
     constructor(baseQuery, column) {
         super(baseQuery, column, "SUM");
     }
-
-    /**
-     * @return PrepareObject
-     */
-    prepare() {
-        return this._prepareObject(this.buildColumn());
-    }
 }

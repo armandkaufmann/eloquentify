@@ -8,11 +8,4 @@ export class Min extends BaseAggregate {
     constructor(baseQuery, column) {
         super(baseQuery, column, "MIN");
     }
-
-    /**
-     * @return PrepareObject
-     */
-    prepare() {
-        return this._prepareObject(this.buildColumn());
-    }
 }

@@ -8,11 +8,4 @@ export class Max extends BaseAggregate {
     constructor(baseQuery, column) {
         super(baseQuery, column, "MAX");
     }
-
-    /**
-     * @return PrepareObject
-     */
-    prepare() {
-        return this._prepareObject(this.buildColumn());
-    }
 }
