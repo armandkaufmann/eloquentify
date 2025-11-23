@@ -8,11 +8,4 @@ export class Average extends BaseAggregate {
     constructor(baseQuery, column) {
         super(baseQuery, column, "AVG");
     }
-
-    /**
-     * @return PrepareObject
-     */
-    prepare() {
-        return this._prepareObject(this.buildColumn());
-    }
 }

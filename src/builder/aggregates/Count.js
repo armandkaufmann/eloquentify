@@ -10,13 +10,11 @@ export class Count extends BaseAggregate {
     }
 
     /**
-     * @return PrepareObject
+     * @return string
      */
-    prepare() {
-        const columnString = this._column === "*"
+    buildColumn() {
+        return this._column === "*"
             ? "*"
-            : this.buildColumn();
-
-        return this._prepareObject(columnString);
+            : super.buildColumn();
     }
 }

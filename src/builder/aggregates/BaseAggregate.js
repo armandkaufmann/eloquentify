@@ -31,21 +31,7 @@ export class BaseAggregate {
      * @return PrepareObject
      */
     prepare() {
-        throw new Error("Base method should not be called. Implement this method.")
-    }
-
-    /**
-     * @return string
-     */
-    buildColumn() {
-        return `${AGGREGATE_TABLE_ALIAS}.${Utility.escapeColumnString(this._column)}`;
-    }
-
-    /**
-     * @param {string} columnString
-     * @return PrepareObject
-     */
-    _prepareObject(columnString) {
+        const columnString = this.buildColumn();
         const baseQueryPrepare = this._baseQuery.prepare();
 
         const combinedQuery = `SELECT ${this._method}(${columnString}) AS ${AGGREGATE_COLUMN_ALIAS} FROM (${baseQueryPrepare.query}) AS ${AGGREGATE_TABLE_ALIAS}`;
@@ -54,5 +40,22 @@ export class BaseAggregate {
             query: combinedQuery,
             bindings: baseQueryPrepare.bindings
         }
+    }
+
+    /**
+     * @return string
+     */
+    toString() {
+        const columnString = this.buildColumn();
+        const baseQueryPrepare = this._baseQuery.toString();
+
+        return `SELECT ${this._method}(${columnString}) AS ${AGGREGATE_COLUMN_ALIAS} FROM (${baseQueryPrepare}) AS ${AGGREGATE_TABLE_ALIAS}`;
+    }
+
+    /**
+     * @return string
+     */
+    buildColumn() {
+        return `${AGGREGATE_TABLE_ALIAS}.${Utility.escapeColumnString(this._column)}`;
     }
 }
