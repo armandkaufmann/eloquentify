@@ -1,5 +1,6 @@
 import {MissingRequiredArgument} from "../../errors/QueryBuilder/Errors.js";
 import {Utility} from "../../utils/Utility.js";
+import Raw from "../statement/raw/Raw.js";
 
 export const AGGREGATE_TABLE_ALIAS = "temp_table";
 export const AGGREGATE_COLUMN_ALIAS = "aggregate";
@@ -14,7 +15,7 @@ export class BaseAggregate {
 
     /**
      * @param {Query} baseQuery
-     * @param {String} column
+     * @param {String|Raw} column
      * @param {String} method
      */
     constructor(baseQuery, column, method) {
@@ -56,6 +57,10 @@ export class BaseAggregate {
      * @return string
      */
     buildColumn() {
+        if (this._column instanceof Raw) {
+            return this._column.toString()
+        }
+
         return `${AGGREGATE_TABLE_ALIAS}.${Utility.escapeColumnString(this._column)}`;
     }
 }

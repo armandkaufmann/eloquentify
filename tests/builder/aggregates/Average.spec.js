@@ -19,4 +19,16 @@ describe("Aggregates: Average", () => {
         expect(countQueryResult.query).toEqual(expectedQuery);
         expect(countQueryResult.bindings).toEqual(expectedBindings);
     });
+
+    test("It supports raw queries", () => {
+        const query = Query.from('users').where('id', '>', 5);
+        const rawQuery = Query.raw("LENGTH(name)");
+
+        const countQueryResult = new Average(query, rawQuery).prepare();
+        const expectedQuery = "SELECT AVG(LENGTH(name)) AS aggregate FROM (SELECT * FROM `users` WHERE `id` > ?) AS temp_table";
+        const expectedBindings = [5];
+
+        expect(countQueryResult.query).toEqual(expectedQuery);
+        expect(countQueryResult.bindings).toEqual(expectedBindings);
+    });
 });
