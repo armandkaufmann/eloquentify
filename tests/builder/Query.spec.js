@@ -1667,6 +1667,19 @@ describe("QueryBuilderTest", () => {
                     expect(DB.prototype.all).not.toHaveBeenCalledOnce();
                     expect(result).toEqual(expectedQuery);
                 });
+
+                test("It uses raw statements", async () => {
+                    const expectedQuery = "SELECT COUNT(CASE WHEN active = 1 THEN 1 END) AS aggregate FROM (SELECT * FROM `users` WHERE `id` > 20) AS temp_table";
+
+                    const result = await Query
+                        .toSql()
+                        .from('users')
+                        .where('id', '>', 20)
+                        .count(Query.raw('CASE WHEN active = 1 THEN 1 END'));
+
+                    expect(DB.prototype.all).not.toHaveBeenCalledOnce();
+                    expect(result).toEqual(expectedQuery);
+                });
             });
 
             describe("Sum", () => {
@@ -1678,6 +1691,19 @@ describe("QueryBuilderTest", () => {
                         .from('users')
                         .where('id', '>', 20)
                         .sum('purchase_count');
+
+                    expect(DB.prototype.all).not.toHaveBeenCalledOnce();
+                    expect(result).toEqual(expectedQuery);
+                });
+
+                test("It uses raw statements", async () => {
+                    const expectedQuery = "SELECT SUM(LENGTH(name)) AS aggregate FROM (SELECT * FROM `users` WHERE `id` > 20) AS temp_table";
+
+                    const result = await Query
+                        .toSql()
+                        .from('users')
+                        .where('id', '>', 20)
+                        .sum(Query.raw("LENGTH(name)"));
 
                     expect(DB.prototype.all).not.toHaveBeenCalledOnce();
                     expect(result).toEqual(expectedQuery);
@@ -1697,6 +1723,19 @@ describe("QueryBuilderTest", () => {
                     expect(DB.prototype.all).not.toHaveBeenCalledOnce();
                     expect(result).toEqual(expectedQuery);
                 });
+
+                test("It uses raw statements", async () => {
+                    const expectedQuery = "SELECT AVG(LENGTH(name)) AS aggregate FROM (SELECT * FROM `users` WHERE `id` > 20) AS temp_table";
+
+                    const result = await Query
+                        .toSql()
+                        .from('users')
+                        .where('id', '>', 20)
+                        .avg(Query.raw("LENGTH(name)"));
+
+                    expect(DB.prototype.all).not.toHaveBeenCalledOnce();
+                    expect(result).toEqual(expectedQuery);
+                });
             });
 
             describe("Min", () => {
@@ -1712,6 +1751,19 @@ describe("QueryBuilderTest", () => {
                     expect(DB.prototype.all).not.toHaveBeenCalledOnce();
                     expect(result).toEqual(expectedQuery);
                 });
+
+                test("It uses raw statements", async () => {
+                    const expectedQuery = "SELECT MIN(LENGTH(name)) AS aggregate FROM (SELECT * FROM `users` WHERE `id` > 20) AS temp_table";
+
+                    const result = await Query
+                        .toSql()
+                        .from('users')
+                        .where('id', '>', 20)
+                        .min(Query.raw("LENGTH(name)"));
+
+                    expect(DB.prototype.all).not.toHaveBeenCalledOnce();
+                    expect(result).toEqual(expectedQuery);
+                });
             });
 
             describe("Max", () => {
@@ -1723,6 +1775,19 @@ describe("QueryBuilderTest", () => {
                         .from('users')
                         .where('id', '>', 20)
                         .max('purchase_count');
+
+                    expect(DB.prototype.all).not.toHaveBeenCalledOnce();
+                    expect(result).toEqual(expectedQuery);
+                });
+
+                test("It uses raw statements", async () => {
+                    const expectedQuery = "SELECT MAX(LENGTH(name)) AS aggregate FROM (SELECT * FROM `users` WHERE `id` > 20) AS temp_table";
+
+                    const result = await Query
+                        .toSql()
+                        .from('users')
+                        .where('id', '>', 20)
+                        .max(Query.raw("LENGTH(name)"));
 
                     expect(DB.prototype.all).not.toHaveBeenCalledOnce();
                     expect(result).toEqual(expectedQuery);

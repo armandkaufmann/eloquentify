@@ -222,7 +222,7 @@ export class Query {
 
     /**
      * @async
-     * @param {String} [column="*"]
+     * @param {String|Raw} [column="*"]
      * @returns {Number}
      * @description Retrieve the "count" result of the query.
      */
@@ -232,7 +232,7 @@ export class Query {
 
     /**
      * @async
-     * @param {String} column
+     * @param {String|Raw} column
      * @returns {Number}
      * @throws MissingRequiredArgument
      * @description Retrieve the sum of the values of a given column.
@@ -243,7 +243,7 @@ export class Query {
 
     /**
      * @async
-     * @param {String} column
+     * @param {String|Raw} column
      * @returns {Number}
      * @throws MissingRequiredArgument
      * @description Retrieve the average of the values of a given column.
@@ -254,7 +254,7 @@ export class Query {
 
     /**
      * @async
-     * @param {String} column
+     * @param {String|Raw} column
      * @returns {Number}
      * @throws MissingRequiredArgument
      * @description Retrieve the average of the values of a given column.
@@ -265,7 +265,7 @@ export class Query {
 
     /**
      * @async
-     * @param {String} column
+     * @param {String|Raw} column
      * @returns {Number}
      * @throws MissingRequiredArgument
      * @description Retrieve the minimum value of a given column.
@@ -276,7 +276,7 @@ export class Query {
 
     /**
      * @async
-     * @param {String} column
+     * @param {String|Raw} column
      * @returns {Number}
      * @throws MissingRequiredArgument
      * @description Retrieve the maximum value of a given column.
