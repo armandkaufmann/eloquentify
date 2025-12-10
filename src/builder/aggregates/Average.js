@@ -3,7 +3,7 @@ import {BaseAggregate} from "./BaseAggregate.js";
 export class Average extends BaseAggregate {
     /**
      * @param {Query} baseQuery
-     * @param {String} column
+     * @param {String|Raw} column
      */
     constructor(baseQuery, column) {
         super(baseQuery, column, "AVG");

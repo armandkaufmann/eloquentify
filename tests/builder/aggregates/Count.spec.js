@@ -24,4 +24,16 @@ describe("Aggregates: Count", () => {
         expect(countQueryResult.query).toEqual(expectedQuery);
         expect(countQueryResult.bindings).toEqual(expectedBindings);
     });
+
+    test("It supports raw queries", () => {
+        const query = Query.from('users').where('id', '>', 5);
+        const rawQuery = Query.raw("CASE WHEN active = 1 THEN 1 END");
+
+        const countQueryResult = new Count(query, rawQuery).prepare();
+        const expectedQuery = "SELECT COUNT(CASE WHEN active = 1 THEN 1 END) AS aggregate FROM (SELECT * FROM `users` WHERE `id` > ?) AS temp_table";
+        const expectedBindings = [5];
+
+        expect(countQueryResult.query).toEqual(expectedQuery);
+        expect(countQueryResult.bindings).toEqual(expectedBindings);
+    });
 });
