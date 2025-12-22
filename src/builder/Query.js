@@ -68,6 +68,7 @@ import {Min} from "./aggregates/Min.js";
 import {Max} from "./aggregates/Max.js";
 import WhereNot from "./statement/where/WhereNot.js";
 import OrWhereNot from "./statement/where/OrWhereNot.js";
+import {Exists} from "./statement/exists/Exists.js";
 
 export class Query {
     /** @type {?string} */
@@ -305,6 +306,26 @@ export class Query {
         const dbResult = await this.#database.all(aggregationPrepareObject.query, aggregationPrepareObject.bindings);
 
         return dbResult[0]?.aggregate ?? 0;
+    }
+
+    /**
+     * @description Determine if any rows exist for the current query.
+     * @returns boolean
+     */
+    async exists() {
+        //todo: check for unions too
+        const clone = this.cloneWithout(this.#queryHaving.isEmpty() ? 'select' : '');
+
+        const existsQuery = new Exists(clone.limit(1));
+
+        if (this.#toSql) {
+            return existsQuery.toString();
+        }
+
+        const existsPrepareObject = existsQuery.prepare();
+        const dbResult = await this.#database.all(existsPrepareObject.query, existsPrepareObject.bindings);
+
+        return dbResult[0] === 1;
     }
 
     /**
