@@ -167,7 +167,7 @@ export class Query {
      * @async
      * @param {...string|Raw|Array<string|Raw>} columns - add columns to be selected
      * @throws TableNotSetError
-     * @returns {Promise<(Object|Model)[]>|Promise<[]>|[]}
+     * @returns {Promise<(Object|Model)[]>|Promise<[]>}
      * @description Execute the query as a "select" statement.
      */
     async get(...columns) {
@@ -189,7 +189,7 @@ export class Query {
      * @async
      * @param {...string|Raw|Array<string|Raw>} columns - add columns to be selected
      * @throws TableNotSetError
-     * @returns {Promise<Object|Model|null>|null}
+     * @returns {Promise<Object|Model|null>}
      * @description Execute the query and get the first result.
      */
     async first(...columns) {
@@ -214,7 +214,7 @@ export class Query {
      * @param {number|string} id
      * @param {...string|Raw|Array<string|Raw>} columns - add columns to be selected
      * @throws TableNotSetError
-     * @returns {Promise<Object|Model|null>|null}
+     * @returns {Promise<Object|Model|null>}
      * @description Execute a query for a single record by ID.
      */
     async find(id, ...columns) {
@@ -224,7 +224,7 @@ export class Query {
     /**
      * @async
      * @param {String|Raw} [column="*"]
-     * @returns {Number}
+     * @returns Promise<number>
      * @description Retrieve the "count" result of the query.
      */
     async count(column = "*") {
@@ -234,7 +234,7 @@ export class Query {
     /**
      * @async
      * @param {String|Raw} column
-     * @returns {Number}
+     * @returns Promise<number>
      * @throws MissingRequiredArgument
      * @description Retrieve the sum of the values of a given column.
      */
@@ -245,7 +245,7 @@ export class Query {
     /**
      * @async
      * @param {String|Raw} column
-     * @returns {Number}
+     * @returns Promise<number>
      * @throws MissingRequiredArgument
      * @description Retrieve the average of the values of a given column.
      */
@@ -256,7 +256,7 @@ export class Query {
     /**
      * @async
      * @param {String|Raw} column
-     * @returns {Number}
+     * @returns Promise<number>
      * @throws MissingRequiredArgument
      * @description Retrieve the average of the values of a given column.
      */
@@ -267,7 +267,7 @@ export class Query {
     /**
      * @async
      * @param {String|Raw} column
-     * @returns {Number}
+     * @returns Promise<number>
      * @throws MissingRequiredArgument
      * @description Retrieve the minimum value of a given column.
      */
@@ -278,7 +278,7 @@ export class Query {
     /**
      * @async
      * @param {String|Raw} column
-     * @returns {Number}
+     * @returns Promise<number>
      * @throws MissingRequiredArgument
      * @description Retrieve the maximum value of a given column.
      */
@@ -468,7 +468,7 @@ export class Query {
     /**
      * @async
      * @param {Record<string, any>} fields
-     * @returns {string|Promise<number|null>}
+     * @returns {Promise<number|null>}
      * @description Update records in the database.
      */
     async update(fields) {
@@ -484,7 +484,7 @@ export class Query {
 
     /**
      * @async
-     * @returns {string|Promise<number|null>} - number of records deleted.
+     * @returns {Promise<number|null>} - number of records deleted.
      * @description Delete records from the database.
      */
     async delete() {
