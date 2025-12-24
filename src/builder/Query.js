@@ -309,8 +309,9 @@ export class Query {
     }
 
     /**
+     * @async
      * @description Determine if any rows exist for the current query.
-     * @returns boolean
+     * @returns Promise<boolean>
      */
     async exists() {
         //todo: check for unions too
@@ -325,7 +326,7 @@ export class Query {
         const existsPrepareObject = existsQuery.prepare();
         const dbResult = await this.#database.all(existsPrepareObject.query, existsPrepareObject.bindings);
 
-        return dbResult[0] === 1;
+        return Object.values(dbResult[0])[0] === 1;
     }
 
     /**

@@ -1811,7 +1811,7 @@ describe("QueryBuilderTest", () => {
             test("It executes query and returns true", async () => {
                 const expectedQuery = "SELECT EXISTS(SELECT * FROM `users` WHERE `id` > ? LIMIT ?)";
                 const expectedBindings = [20, 1];
-                DB.prototype.all.mockResolvedValueOnce([1]);
+                DB.prototype.all.mockResolvedValueOnce([{'EXISTS(SELECT * FROM `users` WHERE `id` > ? LIMIT ?)': 1}]);
 
                 const result = await Query
                     .from('users')
@@ -1825,7 +1825,7 @@ describe("QueryBuilderTest", () => {
             test("It executes query and returns false", async () => {
                 const expectedQuery = "SELECT EXISTS(SELECT * FROM `users` WHERE `id` > ? LIMIT ?)";
                 const expectedBindings = [20, 1];
-                DB.prototype.all.mockResolvedValueOnce([0]);
+                DB.prototype.all.mockResolvedValueOnce([{'EXISTS(SELECT * FROM `users` WHERE `id` > ? LIMIT ?)': 0}]);
 
                 const result = await Query
                     .from('users')
