@@ -108,6 +108,16 @@ export class Query {
     }
 
     /**
+     * @param {string} table
+     * @param {string|null} [as=null]
+     * @returns Query
+     * @description Begin a fluent query against a database table.
+     */
+    static table(table, as = null) {
+        return new Query().table(table, as)
+    }
+
+    /**
      * @returns Query
      */
     static toSql() {
@@ -140,6 +150,17 @@ export class Query {
     from(table, as = null) {
         this.#table = table;
         this.#queryFrom.push(new From(table, as))
+        return this;
+    }
+
+    /**
+     * @param {string} table
+     * @param {string|null} [as=null]
+     * @returns Query
+     * @description Set the table which the query is targeting.
+     */
+    table(table, as = null) {
+        this.from(table, as);
         return this;
     }
 

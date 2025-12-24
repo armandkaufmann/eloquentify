@@ -55,7 +55,7 @@ describe("QueryBuilderTest", () => {
 
             test("Select", async () => {
                 const result = await Query
-                    .from('my_table')
+                    .table('my_table')
                     .toSql()
                     .get();
 
