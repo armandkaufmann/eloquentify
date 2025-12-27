@@ -22,6 +22,9 @@ export class Exists {
         }
     }
 
+    /**
+     * @return string
+     */
     toString() {
         const basePreparedQuery = this._baseQuery.toString();
         return `SELECT EXISTS(${basePreparedQuery})`;
