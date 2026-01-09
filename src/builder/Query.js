@@ -351,6 +351,17 @@ export class Query {
     }
 
     /**
+     * @async
+     * @description Determine if any rows do not exist for the current query.
+     * @returns Promise<boolean>
+     */
+    async doesntExist() {
+        const exists = await this.exists();
+
+        return !exists;
+    }
+
+    /**
      * @returns PrepareObject
      * @description Returns a prepare object for a select query.
      */
