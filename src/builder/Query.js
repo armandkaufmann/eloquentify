@@ -68,6 +68,7 @@ import {Min} from "./aggregates/Min.js";
 import {Max} from "./aggregates/Max.js";
 import WhereNot from "./statement/where/WhereNot.js";
 import OrWhereNot from "./statement/where/OrWhereNot.js";
+import {Exists} from "./statement/exists/Exists.js";
 
 export class Query {
     /** @type {?string} */
@@ -107,6 +108,16 @@ export class Query {
     }
 
     /**
+     * @param {string} table
+     * @param {string|null} [as=null]
+     * @returns Query
+     * @description Begin a fluent query against a database table.
+     */
+    static table(table, as = null) {
+        return new Query().table(table, as)
+    }
+
+    /**
      * @returns Query
      */
     static toSql() {
@@ -143,6 +154,17 @@ export class Query {
     }
 
     /**
+     * @param {string} table
+     * @param {string|null} [as=null]
+     * @returns Query
+     * @description Set the table which the query is targeting.
+     */
+    table(table, as = null) {
+        this.from(table, as);
+        return this;
+    }
+
+    /**
      * @returns Query
      * @description set the query instance to return the raw unprepared query string at execution
      */
@@ -166,7 +188,7 @@ export class Query {
      * @async
      * @param {...string|Raw|Array<string|Raw>} columns - add columns to be selected
      * @throws TableNotSetError
-     * @returns {Promise<(Object|Model)[]>|Promise<[]>|[]}
+     * @returns {Promise<(Object|Model)[]>|Promise<[]>}
      * @description Execute the query as a "select" statement.
      */
     async get(...columns) {
@@ -188,7 +210,7 @@ export class Query {
      * @async
      * @param {...string|Raw|Array<string|Raw>} columns - add columns to be selected
      * @throws TableNotSetError
-     * @returns {Promise<Object|Model|null>|null}
+     * @returns {Promise<Object|Model|null>}
      * @description Execute the query and get the first result.
      */
     async first(...columns) {
@@ -213,7 +235,7 @@ export class Query {
      * @param {number|string} id
      * @param {...string|Raw|Array<string|Raw>} columns - add columns to be selected
      * @throws TableNotSetError
-     * @returns {Promise<Object|Model|null>|null}
+     * @returns {Promise<Object|Model|null>}
      * @description Execute a query for a single record by ID.
      */
     async find(id, ...columns) {
@@ -223,7 +245,7 @@ export class Query {
     /**
      * @async
      * @param {String|Raw} [column="*"]
-     * @returns {Number}
+     * @returns Promise<number>
      * @description Retrieve the "count" result of the query.
      */
     async count(column = "*") {
@@ -233,7 +255,7 @@ export class Query {
     /**
      * @async
      * @param {String|Raw} column
-     * @returns {Number}
+     * @returns Promise<number>
      * @throws MissingRequiredArgument
      * @description Retrieve the sum of the values of a given column.
      */
@@ -244,7 +266,7 @@ export class Query {
     /**
      * @async
      * @param {String|Raw} column
-     * @returns {Number}
+     * @returns Promise<number>
      * @throws MissingRequiredArgument
      * @description Retrieve the average of the values of a given column.
      */
@@ -255,7 +277,7 @@ export class Query {
     /**
      * @async
      * @param {String|Raw} column
-     * @returns {Number}
+     * @returns Promise<number>
      * @throws MissingRequiredArgument
      * @description Retrieve the average of the values of a given column.
      */
@@ -266,7 +288,7 @@ export class Query {
     /**
      * @async
      * @param {String|Raw} column
-     * @returns {Number}
+     * @returns Promise<number>
      * @throws MissingRequiredArgument
      * @description Retrieve the minimum value of a given column.
      */
@@ -277,7 +299,7 @@ export class Query {
     /**
      * @async
      * @param {String|Raw} column
-     * @returns {Number}
+     * @returns Promise<number>
      * @throws MissingRequiredArgument
      * @description Retrieve the maximum value of a given column.
      */
@@ -305,6 +327,38 @@ export class Query {
         const dbResult = await this.#database.all(aggregationPrepareObject.query, aggregationPrepareObject.bindings);
 
         return dbResult[0]?.aggregate ?? 0;
+    }
+
+    /**
+     * @async
+     * @description Determine if any rows exist for the current query.
+     * @returns Promise<boolean>
+     */
+    async exists() {
+        //todo: check for unions too
+        const clone = this.cloneWithout(this.#queryHaving.isEmpty() ? 'select' : '');
+
+        const existsQuery = new Exists(clone.limit(1));
+
+        if (this.#toSql) {
+            return existsQuery.toString();
+        }
+
+        const existsPrepareObject = existsQuery.prepare();
+        const dbResult = await this.#database.all(existsPrepareObject.query, existsPrepareObject.bindings);
+
+        return Object.values(dbResult[0])[0] === 1;
+    }
+
+    /**
+     * @async
+     * @description Determine if any rows do not exist for the current query.
+     * @returns Promise<boolean>
+     */
+    async doesntExist() {
+        const exists = await this.exists();
+
+        return !exists;
     }
 
     /**
@@ -446,7 +500,7 @@ export class Query {
     /**
      * @async
      * @param {Record<string, any>} fields
-     * @returns {string|Promise<number|null>}
+     * @returns {Promise<number|null>}
      * @description Update records in the database.
      */
     async update(fields) {
@@ -462,7 +516,7 @@ export class Query {
 
     /**
      * @async
-     * @returns {string|Promise<number|null>} - number of records deleted.
+     * @returns {Promise<number|null>} - number of records deleted.
      * @description Delete records from the database.
      */
     async delete() {

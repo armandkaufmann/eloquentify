@@ -55,7 +55,7 @@ describe("QueryBuilderTest", () => {
 
             test("Select", async () => {
                 const result = await Query
-                    .from('my_table')
+                    .table('my_table')
                     .toSql()
                     .get();
 
@@ -1794,6 +1794,63 @@ describe("QueryBuilderTest", () => {
                 });
             });
         });
+
+        describe("Exists/Doesn't Exist", () => {
+            test("Exists: It builds query string", async () => {
+                const expectedQuery = "SELECT EXISTS(SELECT * FROM `users` WHERE `id` > 20 LIMIT 1)";
+                const result = await Query
+                    .toSql()
+                    .from('users')
+                    .where('id', '>', 20)
+                    .exists();
+
+                expect(DB.prototype.all).not.toHaveBeenCalledOnce();
+                expect(result).toEqual(expectedQuery);
+            });
+
+            test("Exists: It executes query and returns true", async () => {
+                const expectedQuery = "SELECT EXISTS(SELECT * FROM `users` WHERE `id` > ? LIMIT ?)";
+                const expectedBindings = [20, 1];
+                DB.prototype.all.mockResolvedValueOnce([{'EXISTS(SELECT * FROM `users` WHERE `id` > ? LIMIT ?)': 1}]);
+
+                const result = await Query
+                    .from('users')
+                    .where('id', '>', 20)
+                    .exists();
+
+                expect(DB.prototype.all).toBeCalledWith(expectedQuery, expectedBindings);
+                expect(result).toEqual(true);
+            });
+
+            test("Exists: It executes query and returns false", async () => {
+                const expectedQuery = "SELECT EXISTS(SELECT * FROM `users` WHERE `id` > ? LIMIT ?)";
+                const expectedBindings = [20, 1];
+                DB.prototype.all.mockResolvedValueOnce([{'EXISTS(SELECT * FROM `users` WHERE `id` > ? LIMIT ?)': 0}]);
+
+                const result = await Query
+                    .from('users')
+                    .where('id', '>', 20)
+                    .exists();
+
+                expect(DB.prototype.all).toBeCalledWith(expectedQuery, expectedBindings);
+                expect(result).toEqual(false);
+            });
+
+            test("doesntExist: It executes query and returns true", async () => {
+                const expectedQuery = "SELECT EXISTS(SELECT * FROM `users` WHERE `id` > ? LIMIT ?)";
+                const expectedBindings = [20, 1];
+                DB.prototype.all.mockResolvedValueOnce([{'EXISTS(SELECT * FROM `users` WHERE `id` > ? LIMIT ?)': 0}]);
+
+                const result = await Query
+                    .from('users')
+                    .where('id', '>', 20)
+                    .doesntExist();
+
+                expect(DB.prototype.all).toBeCalledWith(expectedQuery, expectedBindings);
+                expect(result).toEqual(true);
+            });
+
+        })
     });
 
     describe("Utility Functions", () => {
