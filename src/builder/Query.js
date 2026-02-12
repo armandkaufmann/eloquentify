@@ -1,4 +1,3 @@
-import {Utility} from "../utils/Utility.js";
 import {
     InvalidBetweenValueArrayLength,
     InvalidComparisonOperatorError,
@@ -6,7 +5,6 @@ import {
 } from "../errors/QueryBuilder/Errors.js";
 import {DB} from "../DB.js";
 import Builder from "./statement/Builder.js";
-import {STATEMENTS} from "./statement/Base.js";
 import Where from "./statement/where/Where.js";
 import OrWhere from "./statement/where/OrWhere.js";
 import WhereNull from "./statement/where/WhereNull.js";
@@ -69,6 +67,7 @@ import {Max} from "./aggregates/Max.js";
 import WhereNot from "./statement/where/WhereNot.js";
 import OrWhereNot from "./statement/where/OrWhereNot.js";
 import {Exists} from "./statement/exists/Exists.js";
+import {QueryBuilder} from "./QueryBuilder.js";
 
 export class Query {
     /** @type {?string} */
@@ -77,24 +76,9 @@ export class Query {
     #model = null;
     /** @type {boolean} */
     #toSql = false;
-    /** @type {Builder}  */
-    #querySelect = new Builder(STATEMENTS.select);
-    /** @type {Builder}  */
-    #queryFrom = new Builder(STATEMENTS.from);
-    /** @type {Builder}  */
-    #queryJoin = new Builder(STATEMENTS.join);
-    /** @type Builder  */
-    #queryWhere = new Builder(STATEMENTS.where);
-    /** @type Builder  */
-    #queryGroupBy = new Builder(STATEMENTS.group);
-    /** @type Builder  */
-    #queryHaving = new Builder(STATEMENTS.having);
-    /** @type Builder  */
-    #queryOrderBy = new Builder(STATEMENTS.orderBy);
-    /** @type Builder  */
-    #limit = new Builder(STATEMENTS.limit);
-    /** @type Builder  */
-    #offset = new Builder(STATEMENTS.offset);
+    /** @type QueryBuilder  */
+    #queryBuilder = new QueryBuilder();
+    /** @type DB  */
     #database = new DB();
 
     /**
@@ -148,8 +132,7 @@ export class Query {
      * @description Set the table which the query is targeting.
      */
     from(table, as = null) {
-        this.#table = table;
-        this.#queryFrom.push(new From(table, as))
+        this.#queryBuilder.appendQuery('from', new From(table, as));
         return this;
     }
 
@@ -199,10 +182,10 @@ export class Query {
         }
 
         if (this.#toSql) {
-            return this.#buildSelectQuery(true);
+            return this.#queryBuilder.buildSelectSql(true);
         }
 
-        const prepareObject = this.#buildSelectQuery();
+        const prepareObject = this.#queryBuilder.buildSelectSql();
         return await this.#database.all(prepareObject.query, prepareObject.bindings);
     }
 
@@ -223,10 +206,10 @@ export class Query {
         }
 
         if (this.#toSql) {
-            return this.#buildSelectQuery(true);
+            return this.#queryBuilder.buildSelectSql(true);
         }
 
-        const prepareObject = this.#buildSelectQuery();
+        const prepareObject = this.#queryBuilder.buildSelectSql();
         return await this.#database.get(prepareObject.query, prepareObject.bindings);
     }
 
@@ -315,7 +298,8 @@ export class Query {
      */
     async _aggregate(aggregateClass, column) {
         //todo: check for unions too
-        const clone = this.cloneWithout(this.#queryHaving.isEmpty() ? 'select' : '');
+        const excludeQueryBuilderAttributes = this.#queryBuilder.isStatementEmpty('having') ? ['select'] : [];
+        const clone = this.clone([], excludeQueryBuilderAttributes);
         const aggregation = new aggregateClass(clone, column);
 
         if (this.#toSql) {
@@ -336,7 +320,8 @@ export class Query {
      */
     async exists() {
         //todo: check for unions too
-        const clone = this.cloneWithout(this.#queryHaving.isEmpty() ? 'select' : '');
+        const excludeQueryBuilderAttributes = this.#queryBuilder.isStatementEmpty('having') ? ['select'] : [];
+        const clone = this.clone([], excludeQueryBuilderAttributes);
 
         const existsQuery = new Exists(clone.limit(1));
 
@@ -366,7 +351,7 @@ export class Query {
      * @description Returns a prepare object for a select query.
      */
     prepare() {
-        return this.#buildSelectQuery();
+        return this.#queryBuilder.buildSelectSql();
     }
 
     /**
@@ -374,7 +359,7 @@ export class Query {
      * @description Returns a string for a select query.
      */
     toString() {
-        return this.#buildSelectQuery(true);
+        return this.#queryBuilder.buildSelectSql(true);
     }
 
     /**
@@ -384,81 +369,35 @@ export class Query {
         this.#table = attributes?.table ?? this.#table;
         this.#model = attributes?.model ?? this.#model;
         this.#toSql = attributes?.toSql ?? this.#toSql;
-        this.#querySelect = attributes?.select ?? this.#querySelect;
-        this.#queryFrom = attributes?.from ?? this.#queryFrom;
-        this.#queryJoin = attributes?.join ?? this.#queryJoin;
-        this.#queryWhere = attributes?.where ?? this.#queryWhere;
-        this.#queryGroupBy = attributes?.groupBy ?? this.#queryGroupBy;
-        this.#queryHaving = attributes?.having ?? this.#queryHaving;
-        this.#queryOrderBy = attributes?.orderBy ?? this.#queryOrderBy;
-        this.#limit = attributes?.limit ?? this.#limit;
-        this.#offset = attributes?.offset ?? this.#offset;
+        this.#queryBuilder = attributes?.queryBuilder ?? this.#queryBuilder;
     }
 
     /**
+     * @param {?Array<string>} [excludeQueryObjectAttributes=[]]
      * @returns Object
      */
-    _getAttributes() {
-        return {
+    #cloneState(excludeQueryObjectAttributes = []) {
+        const state = {
             table: this.#table,
             model: this.#model,
             toSql: this.#toSql,
-            select: this.#querySelect,
-            from: this.#queryFrom,
-            join: this.#queryJoin,
-            where: this.#queryWhere,
-            groupBy: this.#queryGroupBy,
-            having: this.#queryHaving,
-            orderBy: this.#queryOrderBy,
-            limit: this.#limit,
-            offset: this.#offset,
         };
+
+        state.queryBuilder = this.#queryBuilder.clone(excludeQueryObjectAttributes);
+
+        return state;
     }
 
     /**
-     * @param {?Array<string>} [exclude=[]]
-     * @returns Object
-     */
-    _filterAttributes(exclude = []) {
-        const attributes = this._getAttributes();
-
-        Object.keys(attributes).map((key) => {
-            if (exclude.includes(key)) {
-                delete attributes[key];
-                return;
-            }
-
-            if (attributes[key] instanceof Builder) {
-                attributes[key] = attributes[key].clone();
-            }
-        });
-
-        return attributes;
-    }
-
-    /**
+     * @param {?Array<string>} excludeQueryObjectAttributes
      * @returns Query
-     * @description Clone the query.
+     * @description Clone the query. Can optionally
      */
-    clone() {
+    clone(...excludeQueryObjectAttributes) {
         const clone = new Query();
-        const attributes = this._filterAttributes();
+        const clonedState = this.#cloneState(excludeQueryObjectAttributes);
 
-        clone._hydrate(attributes);
-
-        return clone;
-    }
-
-    /**
-     * @param {...string} attributes
-     * @returns Query
-     * @description Clone the query without the given properties.
-     */
-    cloneWithout(...attributes) {
-        const clone = new Query();
-        const cloneAttributes = this._filterAttributes(attributes);
-
-        clone._hydrate(cloneAttributes);
+        clone._hydrate(clonedState);
 
         return clone;
     }
@@ -473,10 +412,10 @@ export class Query {
         this.#validateTableSet();
 
         if (this.#toSql) {
-            return this.#buildInsertSqlQuery(fields);
+            return this.#queryBuilder.buildInsertSqlString(fields);
         }
 
-        const statement = this.#buildPreparedInsertSqlQuery(fields);
+        const statement = this.#queryBuilder.buildInsertPrepareObject(fields);
         return await this.#database.insert(statement.query, statement.bindings);
     }
 
@@ -490,10 +429,10 @@ export class Query {
         this.#validateTableSet();
 
         if (this.#toSql) {
-            return this.#buildInsertSqlQuery(fields);
+            return this.#queryBuilder.buildInsertSqlString(fields);
         }
 
-        const statement = this.#buildPreparedInsertSqlQuery(fields);
+        const statement = this.#queryBuilder.buildInsertPrepareObject(fields);
         return await this.#database.insert(statement.query, statement.bindings, true);
     }
 
@@ -507,10 +446,10 @@ export class Query {
         this.#validateTableSet();
 
         if (this.#toSql) {
-            return this.#buildFullUpdateSqlQuery(fields);
+            return this.#queryBuilder.buildUpdateSqlString(fields);
         }
 
-        const statement = this.#buildFullUpdatePrepareObject(fields);
+        const statement = this.#queryBuilder.buildUpdatePrepareObject(fields);
         return await this.#database.updateOrDelete(statement.query, statement.bindings);
     }
 
@@ -523,10 +462,10 @@ export class Query {
         this.#validateTableSet();
 
         if (this.#toSql) {
-            return this.#buildFullDeleteSqlQuery();
+            return this.#queryBuilder.buildDeleteSqlString();
         }
 
-        const statement = this.#buildFullDeletePrepareObject();
+        const statement = this.#queryBuilder.buildDeletePrepareObject();
         return await this.#database.updateOrDelete(statement.query, statement.bindings);
     }
 
@@ -538,11 +477,11 @@ export class Query {
     select(...columns) {
         columns.forEach((column) => {
             if (column instanceof Raw) {
-                this.#querySelect.push(column.withSeparator(Separator.Comma));
+                this.#queryBuilder.appendQuery('select', column.withSeparator(Separator.Comma));
             } else if (Array.isArray(column)) {
-                column.forEach((col) => this.#querySelect.push(new Select(col)));
+                column.forEach((col) => this.#queryBuilder.appendQuery('select', new Select(col)));
             } else {
-                this.#querySelect.push(new Select(column));
+                this.#queryBuilder.appendQuery('select', new Select(column));
             }
         });
 
@@ -556,7 +495,7 @@ export class Query {
      * @description Add a new "raw" select expression to the query.
      */
     selectRaw(expression, bindings = null) {
-        this.#querySelect.push(new SelectRaw(expression, bindings));
+        this.#queryBuilder.appendQuery('select', new SelectRaw(expression, bindings));
 
         return this;
     }
@@ -566,7 +505,7 @@ export class Query {
      * @description Force the query to only return distinct results.
      */
     distinct() {
-        this.#querySelect.setDistinct();
+        this.#queryBuilder.setDistinctSelect();
 
         return this;
     }
@@ -583,7 +522,7 @@ export class Query {
     join(table, localKey, operator, foreignKey) {
         Validation.validateComparisonOperator(operator);
 
-        this.#queryJoin.push(new InnerJoin(table, localKey, operator, foreignKey));
+        this.#queryBuilder.appendQuery('join', new InnerJoin(table, localKey, operator, foreignKey));
 
         return this;
     }
@@ -600,7 +539,7 @@ export class Query {
     leftJoin(table, localKey, operator, foreignKey) {
         Validation.validateComparisonOperator(operator);
 
-        this.#queryJoin.push(new LeftJoin(table, localKey, operator, foreignKey));
+        this.#queryBuilder.appendQuery('join', new LeftJoin(table, localKey, operator, foreignKey));
 
         return this;
     }
@@ -611,7 +550,7 @@ export class Query {
      * @description Add a "cross join" clause to the query.
      */
     crossJoin(table) {
-        this.#queryJoin.push(new CrossJoin(table));
+        this.#queryBuilder.appendQuery('join', new CrossJoin(table));
 
         return this;
     }
@@ -680,11 +619,11 @@ export class Query {
         }
 
         if (column instanceof Raw) {
-            this.#queryWhere.push(column.withSeparator(Separator.And));
+            this.#queryBuilder.appendQuery('where', column.withSeparator(Separator.And));
             return this;
         }
 
-        this.#queryWhere.push(new Where(column, operator, value));
+        this.#queryBuilder.appendQuery('where', new Where(column, operator, value));
 
         return this;
     }
@@ -704,11 +643,11 @@ export class Query {
         }
 
         if (column instanceof Raw) {
-            this.#queryWhere.push(column.withSeparator(Separator.And).prependStatement(Condition.Not));
+            this.#queryBuilder.appendQuery('where', column.withSeparator(Separator.And).prependStatement(Condition.Not));
             return this;
         }
 
-        this.#queryWhere.push(new WhereNot(column, operator, value));
+        this.#queryBuilder.appendQuery('where', new WhereNot(column, operator, value));
 
         return this;
     }
@@ -728,11 +667,11 @@ export class Query {
         }
 
         if (column instanceof Raw) {
-            this.#queryWhere.push(column.withSeparator(Separator.Or).prependStatement(Condition.Not));
+            this.#queryBuilder.appendQuery('where', column.withSeparator(Separator.Or).prependStatement(Condition.Not));
             return this;
         }
 
-        this.#queryWhere.push(new OrWhereNot(column, operator, value));
+        this.#queryBuilder.appendQuery('where', new OrWhereNot(column, operator, value));
 
         return this;
     }
@@ -752,11 +691,11 @@ export class Query {
         }
 
         if (column instanceof Raw) {
-            this.#queryWhere.push(column.withSeparator(Separator.Or));
+            this.#queryBuilder.appendQuery('where', column.withSeparator(Separator.Or));
             return this;
         }
 
-        this.#queryWhere.push(new OrWhere(column, operator, value));
+        this.#queryBuilder.appendQuery('where', new OrWhere(column, operator, value));
 
         return this;
     }
@@ -816,7 +755,7 @@ export class Query {
             builder = query(new Query());
         }
 
-        this.#queryWhere.push(new baseClass(builder));
+        this.#queryBuilder.appendQuery('where', new baseClass(builder));
     }
 
     /**
@@ -826,7 +765,7 @@ export class Query {
      * @description Add a raw where clause to the query.
      */
     whereRaw(expression, bindings = null) {
-        this.#queryWhere.push(new WhereRaw(expression, bindings));
+        this.#queryBuilder.appendQuery('where', new WhereRaw(expression, bindings));
 
         return this;
     }
@@ -838,7 +777,7 @@ export class Query {
      * @description Add a raw or where clause to the query.
      */
     orWhereRaw(expression, bindings = null) {
-        this.#queryWhere.push(new OrWhereRaw(expression, bindings));
+        this.#queryBuilder.appendQuery('where', new OrWhereRaw(expression, bindings));
 
         return this;
     }
@@ -849,7 +788,7 @@ export class Query {
      * @description Add a "where null" clause to the query.
      */
     whereNull(column) {
-        this.#queryWhere.push(new WhereNull(column));
+        this.#queryBuilder.appendQuery('where', new WhereNull(column));
 
         return this;
     }
@@ -860,7 +799,7 @@ export class Query {
      * @description Add an "or where null" clause to the query.
      */
     orWhereNull(column) {
-        this.#queryWhere.push(new OrWhereNull(column));
+        this.#queryBuilder.appendQuery('where', new OrWhereNull(column));
 
         return this;
     }
@@ -871,7 +810,7 @@ export class Query {
      * @description Add a "where not null" clause to the query.
      */
     whereNotNull(column) {
-        this.#queryWhere.push(new WhereNotNull(column));
+        this.#queryBuilder.appendQuery('where', new WhereNotNull(column));
 
         return this;
     }
@@ -882,7 +821,7 @@ export class Query {
      * @description Add an "or where not null" clause to the query.
      */
     orWhereNotNull(column) {
-        this.#queryWhere.push(new OrWhereNotNull(column));
+        this.#queryBuilder.appendQuery('where', new OrWhereNotNull(column));
 
         return this;
     }
@@ -895,7 +834,7 @@ export class Query {
      * @description Add a "where" clause to the query for multiple columns with "or" conditions between them.
      */
     whereAny(columns, operator, value) {
-        this.#queryWhere.push(new WhereAny(columns, operator, value));
+        this.#queryBuilder.appendQuery('where', new WhereAny(columns, operator, value));
 
         return this;
     }
@@ -908,7 +847,7 @@ export class Query {
      * @description Add a "where" clause to the query for multiple columns with "and" conditions between them.
      */
     whereAll(columns, operator, value) {
-        this.#queryWhere.push(new WhereAll(columns, operator, value));
+        this.#queryBuilder.appendQuery('where', new WhereAll(columns, operator, value));
 
         return this;
     }
@@ -921,7 +860,7 @@ export class Query {
      * @description Add an "where" clause to the query for multiple columns with "or" conditions between them that don't match the condition
      */
     whereNone(columns, operator, value) {
-        this.#queryWhere.push(new WhereNone(columns, operator, value));
+        this.#queryBuilder.appendQuery('where', new WhereNone(columns, operator, value));
 
         return this;
     }
@@ -933,7 +872,7 @@ export class Query {
      * @description Add a "where in" clause to the query.
      */
     whereIn(column, values) {
-        this.#queryWhere.push(new WhereIn(column, values));
+        this.#queryBuilder.appendQuery('where', new WhereIn(column, values));
 
         return this;
     }
@@ -945,7 +884,7 @@ export class Query {
      * @description Add an "or where in" clause to the query.
      */
     orWhereIn(column, values) {
-        this.#queryWhere.push(new OrWhereIn(column, values));
+        this.#queryBuilder.appendQuery('where', new OrWhereIn(column, values));
 
         return this;
     }
@@ -957,7 +896,7 @@ export class Query {
      * @description Add a "where not in" clause to the query.
      */
     whereNotIn(column, values) {
-        this.#queryWhere.push(new WhereNotIn(column, values));
+        this.#queryBuilder.appendQuery('where', new WhereNotIn(column, values));
 
         return this;
     }
@@ -969,7 +908,7 @@ export class Query {
      * @description Add an "or where not in" clause to the query.
      */
     orWhereNotIn(column, values) {
-        this.#queryWhere.push(new OrWhereNotIn(column, values));
+        this.#queryBuilder.appendQuery('where', new OrWhereNotIn(column, values));
 
         return this;
     }
@@ -984,7 +923,7 @@ export class Query {
     whereBetween(column, values) {
         Validation.validateBetweenArrayLength(values);
 
-        this.#queryWhere.push(new WhereBetween(column, values));
+        this.#queryBuilder.appendQuery('where', new WhereBetween(column, values));
 
         return this;
     }
@@ -999,7 +938,7 @@ export class Query {
     orWhereBetween(column, values) {
         Validation.validateBetweenArrayLength(values);
 
-        this.#queryWhere.push(new OrWhereBetween(column, values));
+        this.#queryBuilder.appendQuery('where', new OrWhereBetween(column, values));
 
         return this;
     }
@@ -1014,7 +953,7 @@ export class Query {
     whereNotBetween(column, values) {
         Validation.validateBetweenArrayLength(values);
 
-        this.#queryWhere.push(new WhereNotBetween(column, values));
+        this.#queryBuilder.appendQuery('where', new WhereNotBetween(column, values));
 
         return this;
     }
@@ -1029,7 +968,7 @@ export class Query {
     orWhereNotBetween(column, values) {
         Validation.validateBetweenArrayLength(values);
 
-        this.#queryWhere.push(new OrWhereNotBetween(column, values));
+        this.#queryBuilder.appendQuery('where', new OrWhereNotBetween(column, values));
 
         return this;
     }
@@ -1050,7 +989,7 @@ export class Query {
 
         Validation.validateComparisonOperator(operator);
 
-        this.#queryWhere.push(new WhereColumn(column, operator, comparisonColumn));
+        this.#queryBuilder.appendQuery('where', new WhereColumn(column, operator, comparisonColumn));
 
         return this;
     }
@@ -1071,7 +1010,7 @@ export class Query {
 
         Validation.validateComparisonOperator(operator);
 
-        this.#queryWhere.push(new OrWhereColumn(column, operator, comparisonColumn));
+        this.#queryBuilder.appendQuery('where', new OrWhereColumn(column, operator, comparisonColumn));
 
         return this;
     }
@@ -1086,7 +1025,7 @@ export class Query {
     whereBetweenColumns(column, columns) {
         Validation.validateBetweenArrayLength(columns);
 
-        this.#queryWhere.push(new WhereBetweenColumns(column, columns));
+        this.#queryBuilder.appendQuery('where', new WhereBetweenColumns(column, columns));
 
         return this;
     }
@@ -1101,7 +1040,7 @@ export class Query {
     orWhereBetweenColumns(column, columns) {
         Validation.validateBetweenArrayLength(columns);
 
-        this.#queryWhere.push(new OrWhereBetweenColumns(column, columns));
+        this.#queryBuilder.appendQuery('where', new OrWhereBetweenColumns(column, columns));
 
         return this;
     }
@@ -1116,7 +1055,7 @@ export class Query {
     whereNotBetweenColumns(column, columns) {
         Validation.validateBetweenArrayLength(columns);
 
-        this.#queryWhere.push(new WhereNotBetweenColumns(column, columns));
+        this.#queryBuilder.appendQuery('where', new WhereNotBetweenColumns(column, columns));
 
         return this;
     }
@@ -1131,7 +1070,7 @@ export class Query {
     orWhereNotBetweenColumns(column, columns) {
         Validation.validateBetweenArrayLength(columns);
 
-        this.#queryWhere.push(new OrWhereNotBetweenColumns(column, columns));
+        this.#queryBuilder.appendQuery('where', new OrWhereNotBetweenColumns(column, columns));
 
         return this;
     }
@@ -1144,9 +1083,9 @@ export class Query {
     groupBy(...columns) {
         columns.forEach((column) => {
             if (column instanceof Raw) {
-                this.#queryGroupBy.push(column.withSeparator(Separator.Comma));
+                this.#queryBuilder.appendQuery('group', column.withSeparator(Separator.Comma));
             } else {
-                this.#queryGroupBy.push(new GroupBy(column));
+                this.#queryBuilder.appendQuery('group', new GroupBy(column));
             }
         });
 
@@ -1159,7 +1098,7 @@ export class Query {
      * @description Add a raw groupBy clause to the query.
      */
     groupByRaw(expression) {
-        this.#queryGroupBy.push(new GroupByRaw(expression));
+        this.#queryBuilder.appendQuery('group', new GroupByRaw(expression));
 
         return this;
     }
@@ -1179,7 +1118,7 @@ export class Query {
         }
 
         if (column instanceof Raw) {
-            this.#queryHaving.push(column.withSeparator(Separator.And));
+            this.#queryBuilder.appendQuery('having', column.withSeparator(Separator.And));
             return this;
         }
 
@@ -1190,7 +1129,7 @@ export class Query {
 
         Validation.validateComparisonOperator(operator);
 
-        this.#queryHaving.push(new Having(column, operator, value));
+        this.#queryBuilder.appendQuery('having', new Having(column, operator, value));
 
         return this;
     }
@@ -1210,7 +1149,7 @@ export class Query {
         }
 
         if (column instanceof Raw) {
-            this.#queryHaving.push(column.withSeparator(Separator.Or));
+            this.#queryBuilder.appendQuery('having', column.withSeparator(Separator.Or));
             return this;
         }
 
@@ -1221,7 +1160,7 @@ export class Query {
 
         Validation.validateComparisonOperator(operator);
 
-        this.#queryHaving.push(new OrHaving(column, operator, value));
+        this.#queryBuilder.appendQuery('having', new OrHaving(column, operator, value));
 
         return this;
     }
@@ -1233,7 +1172,7 @@ export class Query {
      * @description Add a raw having clause to the query.
      */
     havingRaw(expression, bindings = null) {
-        this.#queryHaving.push(new HavingRaw(expression, bindings));
+        this.#queryBuilder.appendQuery('having', new HavingRaw(expression, bindings));
 
         return this;
     }
@@ -1245,7 +1184,7 @@ export class Query {
      * @description Add a raw or having clause to the query.
      */
     orHavingRaw(expression, bindings = null) {
-        this.#queryHaving.push(new OrHavingRaw(expression, bindings));
+        this.#queryBuilder.appendQuery('having', new OrHavingRaw(expression, bindings));
 
         return this;
     }
@@ -1260,7 +1199,7 @@ export class Query {
     havingBetween(column, values) {
         Validation.validateBetweenArrayLength(values);
 
-        this.#queryHaving.push(new HavingBetween(column, values));
+        this.#queryBuilder.appendQuery('having', new HavingBetween(column, values));
 
         return this;
     }
@@ -1275,7 +1214,7 @@ export class Query {
     orHavingBetween(column, values) {
         Validation.validateBetweenArrayLength(values);
 
-        this.#queryHaving.push(new OrHavingBetween(column, values));
+        this.#queryBuilder.appendQuery('having', new OrHavingBetween(column, values));
 
         return this;
     }
@@ -1288,11 +1227,11 @@ export class Query {
      */
     orderBy(column, order = "ASC") {
         if (column instanceof Raw) {
-            this.#queryOrderBy.push(column.withSeparator(Separator.Comma).appendStatement(order));
+            this.#queryBuilder.appendQuery('order', column.withSeparator(Separator.Comma).appendStatement(order));
             return this;
         }
 
-        this.#queryOrderBy.push(new OrderBy(column, order));
+        this.#queryBuilder.appendQuery('order', new OrderBy(column, order));
         return this;
     }
 
@@ -1303,11 +1242,11 @@ export class Query {
      */
     orderByDesc(column) {
         if (column instanceof Raw) {
-            this.#queryOrderBy.push(column.withSeparator(Separator.Comma).appendStatement("DESC"));
+            this.#queryBuilder.appendQuery('order', column.withSeparator(Separator.Comma).appendStatement("DESC"));
             return this;
         }
 
-        this.#queryOrderBy.push(new OrderByDesc(column));
+        this.#queryBuilder.appendQuery('order', new OrderByDesc(column));
         return this;
     }
 
@@ -1317,7 +1256,7 @@ export class Query {
      * @description Add a raw "order by" clause to the query.
      */
     orderByRaw(expression) {
-        this.#queryOrderBy.push(new Raw(expression).withSeparator(Separator.Comma));
+        this.#queryBuilder.appendQuery('order', new Raw(expression).withSeparator(Separator.Comma));
         return this;
     }
 
@@ -1327,7 +1266,7 @@ export class Query {
      * @description Set the "limit" value of the query.
      */
     limit(number) {
-        this.#limit.push(new Limit(number));
+        this.#queryBuilder.appendQuery('limit', new Limit(number));
         return this;
     }
 
@@ -1337,7 +1276,7 @@ export class Query {
      * @description Set the "offset" value of the query.
      */
     offset(number) {
-        this.#offset.push(new Offset(number));
+        this.#queryBuilder.appendQuery('offset', new Offset(number));
         return this;
     }
 
@@ -1353,7 +1292,7 @@ export class Query {
 
         callback(whereCallback);
 
-        this.#queryWhere.push(group);
+        this.#queryBuilder.appendQuery('where', group);
     }
 
     /**
@@ -1367,205 +1306,14 @@ export class Query {
 
         callback(whereCallback);
 
-        this.#queryHaving.push(group);
-    }
-
-    /**
-     * @param {Record<string, any>} fields
-     * @returns string
-     */
-    #buildInsertSqlQuery(fields) {
-        let columns = [];
-        let values = [];
-
-        for (const [column, value] of Object.entries(fields)) {
-            columns.push(column);
-            values.push(value);
-        }
-
-        return "INSERT INTO " + this.#table + " (" + columns.join(', ') +
-            ") VALUES (" + Utility.valuesToString(values) + ")";
-    }
-
-    /**
-     * @param {Record<string, any>} fields
-     * @returns {Object}
-     */
-    #buildPreparedInsertSqlQuery(fields) {
-        let columns = [];
-        let values = [];
-
-        for (const [column, value] of Object.entries(fields)) {
-            columns.push(column);
-            values.push(value);
-        }
-
-        const query = "INSERT INTO " + this.#queryFrom.toggleWithStatement(false).toString()
-            + " (" + columns.join(', ') +
-            ") VALUES (" + Array(values.length).fill('?').join(', ') + ")";
-
-        return {
-            query,
-            bindings: values
-        }
-    }
-
-    /**
-     * @returns string
-     */
-    #buildFullUpdateSqlQuery(fields) {
-        const queries = [
-            this.#buildPartialUpdateSqlQuery(fields), this.#queryWhere.toString(),
-            this.#queryOrderBy.toString(), this.#limit.toString(),
-        ];
-
-        return this.#joinQueryStrings(queries)
-    }
-
-    /**
-     * @returns PrepareObject
-     */
-    #buildFullUpdatePrepareObject(fields) {
-        const queries = [
-            this.#buildPartialUpdatePrepareObject(fields), this.#queryWhere.prepare(),
-            this.#queryOrderBy.prepare(), this.#limit.prepare(),
-        ];
-
-        return this.#joinPrepareObjects(queries)
-    }
-
-    /**
-     * @returns PrepareObject
-     */
-    #buildPartialUpdatePrepareObject(fields) {
-        let pairs = [];
-        let bindings = [];
-
-        for (const [column, value] of Object.entries(fields)) {
-            pairs.push(`${column} = ?`);
-            bindings.push(value);
-        }
-
-        const query = "UPDATE " + this.#queryFrom.toggleWithStatement(false).toString()
-            + " SET " + pairs.join(', ');
-
-        return {
-            query, bindings
-        };
-    }
-
-    /**
-     * @returns string
-     */
-    #buildPartialUpdateSqlQuery(fields) {
-        let pairs = [];
-
-        for (const [column, value] of Object.entries(fields)) {
-            pairs.push(`${column} = ${Utility.valuesToString([value])}`)
-        }
-
-        return "UPDATE " + this.#queryFrom.toggleWithStatement(false).toString()
-            + " SET " + pairs.join(', ');
-    }
-
-    /**
-     * @returns string
-     */
-    #buildFullDeleteSqlQuery() {
-        const queryDelete = this.#buildPartialDeleteSqlQuery();
-
-        const queries = [
-            queryDelete, this.#queryWhere.toString(),
-            this.#queryOrderBy.toString(), this.#limit.toString(),
-        ];
-
-        return this.#joinQueryStrings(queries)
-    }
-
-    /**
-     * @returns PrepareObject
-     */
-    #buildFullDeletePrepareObject() {
-        const queries = [
-            this.#buildPartialDeletePrepareObject(), this.#queryWhere.prepare(),
-            this.#queryOrderBy.prepare(), this.#limit.prepare(),
-        ];
-
-        return this.#joinPrepareObjects(queries)
-    }
-
-    #buildPartialDeletePrepareObject() {
-        const query = "DELETE FROM " + this.#queryFrom
-            .toggleWithStatement(false)
-            .toString();
-
-        const bindings = [];
-
-        return {query, bindings};
-    }
-
-    #buildPartialDeleteSqlQuery() {
-        return "DELETE FROM " + this.#table;
-    }
-
-    /**
-     * @param {boolean} [toString=false]
-     * @returns PrepareObject|string
-     */
-    #buildSelectQuery(toString = false) {
-        const queryCollection = [
-            this.#querySelect, this.#queryFrom,
-            this.#queryJoin, this.#queryWhere,
-            this.#queryGroupBy, this.#queryHaving,
-            this.#queryOrderBy, this.#limit,
-            this.#offset,
-        ];
-
-        const queries = queryCollection.map((query) => {
-            if (toString) {
-                return query.toString();
-            }
-
-            return query.prepare();
-        });
-
-        if (toString) {
-            return this.#joinQueryStrings(queries);
-        }
-
-        return this.#joinPrepareObjects(queries);
-    }
-
-    /**
-     * @param {Array<PrepareObject>} queries
-     * @returns PrepareObject
-     */
-    #joinPrepareObjects(queries) {
-        const query = this.#joinQueryStrings(queries.map(query => query.query));
-
-        const bindings = queries.reduce((accumulator, query) => {
-            return [...accumulator, ...query.bindings];
-        }, []);
-
-        return {query, bindings};
-    }
-
-    /**
-     * @param {Array<string>} queries
-     * @returns string
-     */
-    #joinQueryStrings(queries) {
-        return queries
-            .reduce((result, queryString, index) => {
-                return result += queryString !== "" ? (index > 0 ? ' ' : '') + queryString : ''
-            }, "");
+        this.#queryBuilder.appendQuery('having', group);
     }
 
     /**
      * @throws TableNotSetError
      */
     #validateTableSet() {
-        if (!this.#table) {
+        if (!this.#queryBuilder.getTable()) {
             throw new TableNotSetError("Query Builder");
         }
     }

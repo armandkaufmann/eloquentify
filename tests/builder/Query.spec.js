@@ -1463,7 +1463,7 @@ describe("QueryBuilderTest", () => {
 
                 const result = await Query.toSql().from('users').insert(fields);
 
-                expect(result).toBe("INSERT INTO users (name, address) VALUES ('john', '123 Taco Lane Ave St')");
+                expect(result).toBe("INSERT INTO `users` (name, address) VALUES ('john', '123 Taco Lane Ave St')");
             });
         });
 
@@ -1636,7 +1636,7 @@ describe("QueryBuilderTest", () => {
                     .offset(1)
                     .delete();
 
-                expect(result).toBe("DELETE FROM users WHERE `name` = 'john' ORDER BY `name` ASC LIMIT 1");
+                expect(result).toBe("DELETE FROM `users` WHERE `name` = 'john' ORDER BY `name` ASC LIMIT 1");
             })
         });
 
@@ -1901,7 +1901,7 @@ describe("QueryBuilderTest", () => {
             });
 
             test("Clone Without: excludes attributes when cloned", async () => {
-                const queryClone = query.cloneWithout('select', 'where', 'having');
+                const queryClone = query.clone('select', 'where', 'having');
 
                 const queryCloneResult = await queryClone.toSql().get();
                 const originalQueryResult = await query.toSql().get();
