@@ -299,7 +299,7 @@ export class Query {
     async _aggregate(aggregateClass, column) {
         //todo: check for unions too
         const excludeQueryBuilderAttributes = this.#queryBuilder.isStatementEmpty('having') ? ['select'] : [];
-        const clone = this.clone(excludeQueryBuilderAttributes);
+        const clone = this.clone(...excludeQueryBuilderAttributes);
         const aggregation = new aggregateClass(clone, column);
 
         if (this.#toSql) {
@@ -321,7 +321,7 @@ export class Query {
     async exists() {
         //todo: check for unions too
         const excludeQueryBuilderAttributes = this.#queryBuilder.isStatementEmpty('having') ? ['select'] : [];
-        const clone = this.clone(excludeQueryBuilderAttributes);
+        const clone = this.clone(...excludeQueryBuilderAttributes);
 
         const existsQuery = new Exists(clone.limit(1));
 

@@ -1792,6 +1792,21 @@ describe("QueryBuilderTest", () => {
                     expect(DB.prototype.all).not.toHaveBeenCalledOnce();
                     expect(result).toEqual(expectedQuery);
                 });
+
+                test("It clones when executing the statement without certain statements", async () => {
+                    //todo: check for unions too
+                    const expectedQuery = "SELECT MAX(temp_table.`purchase_count`) AS aggregate FROM (SELECT * FROM `users` WHERE `id` > 20) AS temp_table";
+
+                    const result = await Query
+                        .toSql()
+                        .select('id')
+                        .from('users')
+                        .where('id', '>', 20)
+                        .max('purchase_count');
+
+                    expect(DB.prototype.all).not.toHaveBeenCalledOnce();
+                    expect(result).toEqual(expectedQuery);
+                });
             });
         });
 
