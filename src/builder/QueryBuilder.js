@@ -34,9 +34,7 @@ export class QueryBuilder {
      * @returns void
      */
     _hydrate(attributes) {
-        Object.keys(attributes).forEach((key) => {
-            this.#query[key] = attributes[key];
-        });
+        this.#query = {...this.#query, ...attributes.query};
     }
 
     /**
@@ -45,8 +43,8 @@ export class QueryBuilder {
      */
     clone(excludeFromQueryObject = []) {
         const queryBuilderClone = new QueryBuilder();
-        const clonedState = this.#cloneState(excludeFromQueryObject);
 
+        const clonedState = this.#cloneState(excludeFromQueryObject);
         queryBuilderClone._hydrate(clonedState);
 
         return queryBuilderClone;
@@ -57,17 +55,28 @@ export class QueryBuilder {
      * @returns Object
      */
     #cloneState(excludeFromQueryObject = []) {
-        const attributes = {};
+        const attributes = this._getAttributes();
 
-        Object.keys(this.#query).forEach((key) => {
+        // clone the query objects
+        Object.keys(attributes.query).forEach((key) => {
             if (excludeFromQueryObject.includes(key)) {
+                delete attributes.query[key];
                 return;
             }
 
-            attributes[key] = this.#query[key].clone();
+            attributes.query[key] = attributes.query[key].clone();
         });
 
         return attributes;
+    }
+
+    /**
+     * @returns Object
+     */
+    _getAttributes() {
+        return {
+            query: {...this.#query}
+        }
     }
 
     /**
