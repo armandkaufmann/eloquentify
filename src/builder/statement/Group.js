@@ -56,6 +56,10 @@ export default class Group extends Builder {
             prepareObject.query = `${this._condition} ${prepareObject.query}`;
         }
 
+        if (this._prependString) {
+            prepareObject.query = `${this._prependString} ${prepareObject.query}`;
+        }
+
         return prepareObject;
     }
 
@@ -63,7 +67,7 @@ export default class Group extends Builder {
      * @return Group
      */
     clone() {
-        return this._clone(new Group(this._condition))
+        return this._clone(new Group(this._condition, this._prependString))
     }
 
     /**

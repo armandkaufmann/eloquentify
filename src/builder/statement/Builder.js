@@ -137,7 +137,7 @@ export default class Builder {
      */
     _getAttributes() {
         return {
-            statements: this._statements,
+            statements: [...this._statements],
             type: this._type,
             withStatement: this._withStatement,
             defaultQueryPartial: this._defaultQueryPartial,

@@ -677,7 +677,7 @@ describe("QueryBuilderTest", () => {
                         expect(result).toBe(expectedResult);
                     });
 
-                    test("Or Where Not: It groups or where statement with callback when only single where statement", async () => {
+                    test("SqlString: Or Where Not: It groups or where statement with callback when only single where statement", async () => {
                         const result = await Query
                             .from('users')
                             .toSql()
@@ -691,6 +691,21 @@ describe("QueryBuilderTest", () => {
                         const expectedResult = "SELECT * FROM `users` WHERE NOT (`name` = 'John' OR `id` > 1)";
 
                         expect(result).toBe(expectedResult);
+                    });
+
+                    test("Prepare: Or Where Not: It groups or where statement with callback when only single where statement", async () => {
+                        const result = await Query
+                            .from('users')
+                            .orWhereNot(($query) => {
+                                $query
+                                    .where('name', '=', 'John')
+                                    .orWhere('id', '>', 1);
+                            })
+                            .prepare();
+
+                        const expectedResult = "SELECT * FROM `users` WHERE NOT (`name` = ? OR `id` > ?)";
+
+                        expect(result.query).toBe(expectedResult);
                     });
                 });
             });
