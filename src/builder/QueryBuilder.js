@@ -157,7 +157,7 @@ export class QueryBuilder {
 
     /**
      * @param {boolean} [toString=false]
-     * @returns PrepareObject|string
+     * @returns {PrepareObject|string}
      */
     buildSelectSql(toString = false) {
         const queries = Object.keys(this.#query).map((key) => {
